@@ -1,0 +1,39 @@
+//===================================================================
+// Farlight.rc – resource script
+//===================================================================
+
+#include "resource.h" 
+#include "windows.h"
+#include "winres.h"// pulls in IDR_LOGO_PNG, IDR_FONT1, …
+
+//-------------------------------------------------------------------
+// Binary resources (RCDATA)
+//-------------------------------------------------------------------
+
+// 101 – logo PNG
+IDR_LOGO_PNG          RCDATA    "images\\kaorinobg-Photoroom.png"
+
+// 102 – first TTF
+IDR_FONT1             RCDATA    "fonts\\Tahomabd.ttf"
+
+// 103 – second font (OTF)
+IDR_FONT2             RCDATA    "fonts\\TT Moons Trial Light.otf"
+
+// 104 – third font (OTF) – you can reuse the same file or use a different one
+IDR_FONT3             RCDATA    "fonts\\TT Moons Trial Light.otf"
+
+IDI_ICON1               ICON                    "images\\Farlight.ico"
+
+//-------------------------------------------------------------------
+// Language declaration – **must be the last non-blank line**
+//-------------------------------------------------------------------
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+
+//-------------------------------------------------------------------
+// Auto-generated “next value” macros – keep them in sync
+//-------------------------------------------------------------------
+#ifdef APSTUDIO_INVOKED
+#ifndef APSTUDIO_READONLY_SYMBOLS
+ 
+#endif
+#endif

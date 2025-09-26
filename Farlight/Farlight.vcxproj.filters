@@ -1,0 +1,122 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Aimbot\Aimbot.cpp">
+      <Filter>Aimbot</Filter>
+    </ClCompile>
+    <ClCompile Include="Cache\Game.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGUI\imgui.cpp">
+      <Filter>ImGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGUI\imgui_demo.cpp">
+      <Filter>ImGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGUI\imgui_draw.cpp">
+      <Filter>ImGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGUI\imgui_impl_dx11.cpp">
+      <Filter>ImGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGUI\imgui_impl_win32.cpp">
+      <Filter>ImGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGUI\imgui_tables.cpp">
+      <Filter>ImGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGUI\imgui_widgets.cpp">
+      <Filter>ImGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="Kmbox\KmboxNet.cpp">
+      <Filter>Aimbot</Filter>
+    </ClCompile>
+    <ClCompile Include="Overlay\Render.cpp">
+      <Filter>Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Utils\Utils.h">
+      <Filter>Utils</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Aimbot\Aimbot.h">
+      <Filter>Aimbot</Filter>
+    </ClInclude>
+    <ClInclude Include="Cache\Game.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Globals.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGUI\imconfig.h">
+      <Filter>ImGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGUI\imgui.h">
+      <Filter>ImGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGUI\imgui_impl_dx11.h">
+      <Filter>ImGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGUI\imgui_impl_win32.h">
+      <Filter>ImGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGUI\imgui_internal.h">
+      <Filter>ImGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGUI\imstb_rectpack.h">
+      <Filter>ImGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGUI\imstb_textedit.h">
+      <Filter>ImGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGUI\imstb_truetype.h">
+      <Filter>ImGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="Kmbox\kmbox_interface.hpp">
+      <Filter>Aimbot</Filter>
+    </ClInclude>
+    <ClInclude Include="Kmbox\KmboxNet.h">
+      <Filter>Aimbot</Filter>
+    </ClInclude>
+    <ClInclude Include="Overlay\Render.h">
+      <Filter>Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Kmbox\HidTable.h">
+      <Filter>Aimbot</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\singleton.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGUI\D3DX11.h" />
+    <ClInclude Include="ImGUI\D3DX11tex.h" />
+    <ClInclude Include="resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Aimbot">
+      <UniqueIdentifier>{0fb32873-43a9-4334-b4a2-8307337b398d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game">
+      <UniqueIdentifier>{e404aba9-ac3b-4bf6-9a4b-1e12aeccd4fa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGUI">
+      <UniqueIdentifier>{1e4c6968-d07c-4b49-994c-ec5779a165f0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render">
+      <UniqueIdentifier>{026cea60-1d8b-47e5-8def-d3ea25e8e3ff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utils">
+      <UniqueIdentifier>{2c411bac-acf1-4fc7-8f3b-7d385f3a85cb}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="images\kaorinobg-Photoroom.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Font Include="fonts\Tahomabd.ttf" />
+    <Font Include="fonts\TT Moons Trial Light.otf" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="FarlightDMA.rc" />
+  </ItemGroup>
+</Project>
