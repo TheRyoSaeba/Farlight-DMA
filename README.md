@@ -16,6 +16,11 @@ But i got Banned, Then i had a Delta Force ESP going before ban and encryption s
 -  finish menu
 -  so much more 
 
+ <img width="1366" height="735" alt="Screenshot 2025-09-26 070743" src="https://github.com/user-attachments/assets/854cef3d-e9b2-46fd-b9bc-1566204ddd5d" />
+
+
+
+
 ## Credits:
 
 [BASE](https://github.com/boggymc/MarvelRivals-DMA) - Turned it into a Mess
