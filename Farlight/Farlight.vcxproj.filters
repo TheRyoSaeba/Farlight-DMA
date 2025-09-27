@@ -38,6 +38,7 @@
     <ClCompile Include="Utils\Utils.h">
       <Filter>Utils</Filter>
     </ClCompile>
+    <ClCompile Include="Cache\ItemESP.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Aimbot\Aimbot.h">
@@ -91,6 +92,7 @@
     <ClInclude Include="ImGUI\D3DX11.h" />
     <ClInclude Include="ImGUI\D3DX11tex.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="Cache\ItemESP.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Aimbot">

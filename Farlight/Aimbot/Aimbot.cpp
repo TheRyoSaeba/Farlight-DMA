@@ -64,6 +64,7 @@ void aimAt(Vector2 target) {
 	switch (Globals.aimType) {
 	case BPRO: {
 		std::string command = "km.move(" + std::to_string(target.x) + "," + std::to_string(target.y) + ")\r\n";
+		
 		send_command(hSerial, command.c_str());
 		break;
 	}
@@ -78,7 +79,7 @@ void aimAt(Vector2 target) {
 }
 
 void Aimbot::aimbot(Vector2 target) {
-	if (!mem.GetKeyboard()->IsKeyDown(0x02)) return;
+	//if (!mem.GetKeyboard()->IsKeyDown(0x02)) return;
 
 	float x = target.x;
 	float y = target.y;

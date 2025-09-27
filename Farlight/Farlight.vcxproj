@@ -163,7 +163,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include\;C:\Users\askmo\source\repos\FarlightDMA\Farlight;C:\Users\askmo\source\repos\FarlightDMA;$(SolutionDir);$(ProjectDir)</AdditionalIncludeDirectories>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
@@ -181,6 +181,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Aimbot\Aimbot.cpp" />
+    <ClCompile Include="Cache\ItemESP.cpp" />
     <ClCompile Include="ImGUI\imgui.cpp" />
     <ClCompile Include="ImGUI\imgui_demo.cpp" />
     <ClCompile Include="ImGUI\imgui_draw.cpp" />
@@ -197,6 +198,7 @@
   <ItemGroup>
     <ClInclude Include="Aimbot\Aimbot.h" />
     <ClInclude Include="Cache\Game.h" />
+    <ClInclude Include="Cache\ItemESP.h" />
     <ClInclude Include="Utils\Globals.h" />
     <ClInclude Include="Kmbox\HidTable.h" />
     <ClInclude Include="ImGUI\D3DX11.h" />

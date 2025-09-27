@@ -204,8 +204,10 @@ namespace util {
 }
 
 
-
- 
+enum class ETargetPriority {
+	Head,
+	Body
+};
 
 enum AimType {
 	AIM_NONE,

@@ -10401,7 +10401,7 @@ void    ImGui::ErrorRecoveryTryToRecoverWindowState(const ImGuiErrorRecoveryStat
     while (g.ColorStack.Size > state_in->SizeOfColorStack) //-V1044
     {
         IM_ASSERT_USER_ERROR(0, "Missing PopStyleColor()");
-        PopStyleColor();
+      PopStyleColor(); 
     }
     while (g.ItemFlagsStack.Size > state_in->SizeOfItemFlagsStack) //-V1044
     {

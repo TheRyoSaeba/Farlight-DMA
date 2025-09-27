@@ -2,6 +2,7 @@
 #define NOMINMAX
 #include <limits>
 #include "Cache/Game.h"
+#include "Cache/ItemESP.h"
 #include <string>
 #include <Utils/singleton.h>
 #include <shared_mutex>
@@ -11,44 +12,89 @@
 #include "../DMALibrary/Memory/Memory.h"
 #include <iostream>
 inline namespace FarlightDMA {
-	class Globals : public Singleton<Globals> {
+    class Globals : public Singleton<Globals> {
+    public:
+        int screenWidth = 2560;
+        int screenHeight = 1440;
 
-	public:
-		int screenWidth = 2560;
-		int screenHeight = 1440;
-		int maxDistance = 300; // in meters
-		bool itemsEnabled = true;
+         
+        float maxDistance = 300.0f;
+        float MaxItemDistance = 300.0f;
+
+       
         bool ESPEnabled = true;
-		int BoxStyle = 1;  
-		bool HeadEnabled = true;
-		bool DistanceEnabled = true;
-		bool refreshcheat = false;
-		int OpenMenuKey = VK_INSERT;
-        //color 
-        ImVec4 menuAccentColor = ImVec4(0.8f, 0.3f, 0.0f, 1.0f);  // Orange accent
-        ImVec4 textColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);        // White text
-        ImVec4 bgColor = ImVec4(0.1f, 0.1f, 0.1f, 0.9f);          // Dark background
-        ImVec4 headerColor = ImVec4(0.15f, 0.15f, 0.15f, 1.0f);   // Header background
+		bool DrawHeadCircle = true;
+		bool DrawBones = true;
+		bool DrawLowHP = true;
+		bool DrawNames = true;
+		bool DrawTraceline = false;
+        bool itemsEnabled = true;
+        bool DrawItemName = true;
+        bool DrawItemBox = true;
+        bool HeadEnabled = true;
+        bool DistanceEnabled = true;
+        bool refreshcheat = false;
 
-		std::string processName = "SolarlandClient-Win64-Shipping.exe";
-		HANDLE scatterHandle;
-		std::vector<PlayerRender> renderPlayers;
+     
+       //aimbot 
+        bool EnableAimbot = true;
+        
+        int BoxStyle = 1;   
+        float LineThickness = 1.5f;   
+
+       
+        std::unordered_set<EItemCategory> enabledItemCategories;
+        std::unordered_set<EWeaponType> enabledWeaponTypes;
+
+       //MENU
+        int OvrlyMode = 0 ;
+         HWND overlayHWND = nullptr;
+         bool sidebarOpen = true;
+        //
+        ImVec4 ColorPlayerBox = ImVec4(0.1f, 1.0f, 0.1f, 1.0f); // green
+        ImVec4 ColorBones = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // white
+        ImVec4 ColorLines = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // white
+        ImVec4 ColorName = ImVec4(1.0f, 1.0f, 0.6f, 1.0f); // yellowish
+        ImVec4 ColorDistance = ImVec4(0.8f, 0.8f, 0.8f, 1.0f); // grey
+        ImVec4 ColorHead = ImVec4(0.6f, 0.6f, 1.0f, 1.0f); // bluish
+        ImVec4 ColorLowHP = ImVec4(1.0f, 0.3f, 0.3f, 1.0f); // red
+        ImVec4 ColorItems = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // white
+        ImVec4 ColorWeapons = ImVec4(1.0f, 0.5f, 0.2f, 1.0f); // orange
+        ImVec4 ColorFOV = ImVec4(1.0f, 1.0f, 1.0f, 0.8f); // white (slightly transparent)
+
+        // --- Menu Style ---
+        ImVec4 menuAccentColor = ImVec4(0.8f, 0.3f, 0.0f, 1.0f);
+        ImVec4 textColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        ImVec4 bgColor = ImVec4(0.1f, 0.1f, 0.1f, 0.9f);
+        ImVec4 headerColor = ImVec4(0.15f, 0.15f, 0.15f, 1.0f);
+
+        // --- Process / Memory ---
+        std::string processName = "SolarlandClient-Win64-Shipping.exe";
+        HANDLE scatterHandle;
+        int OpenMenuKey = VK_INSERT;
+
+        // --- Render Data ---
+        std::vector<PlayerRender> renderPlayers;
         std::vector<ItemRenderer> renderItems;
-		std::shared_mutex playerMutex;
-        std::shared_mutex itemMutex;
+        std::mutex playerMutex;
+        std::mutex itemMutex;
 
-		int readFPS = 0;
+        // --- Misc ---
+         int overlayMode = 0;
+          int target_monitor = -1;
+         int monitor_enum_state = 0;
+        int readFPS = 0;
+        AimType aimType;
+        ETargetPriority TargetPriority = ETargetPriority::Head;
 
-		AimType aimType;
+        // --- Fonts & Assets ---
+        ImFont* logoFont = nullptr;
+        ImFont* headerFont = nullptr;
+        ImFont* regularFont = nullptr;
 
-		ImFont* logoFont = nullptr;
-		ImFont* headerFont = nullptr;
-		ImFont* regularFont = nullptr;
-
-		ImTextureID logoTexture = 0;
-		int logoWidth = 1280;
-		int logoHeight = 608;
-
+        ImTextureID logoTexture = 0;
+        int logoWidth = 1280;
+        int logoHeight = 608;
 		struct Offsets {
 			uintptr_t uworld = 0x9F319B0;
 			uintptr_t persistentlevel = 0x30;
@@ -80,7 +126,11 @@ inline namespace FarlightDMA {
 
 		struct Settings {
 			float smoothing = 2.25;
-			int fov = 200;
+			float fov = 90.0f;
+            bool IgnoreKnocked = true;
+            bool TriggerbotEnabled = false;
+            int TriggerDelayMS;
+			float AimbotMaxDistance = 300.0f;
 		} settings;
 
 		struct Aimbot {

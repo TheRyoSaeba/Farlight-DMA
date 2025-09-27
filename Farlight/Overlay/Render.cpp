@@ -17,11 +17,12 @@
 #include <resource.h>
 #include <DMALibrary/Memory/Memory.h>
 
+static HWND g_hOverlayWnd = nullptr;
+
 //DRAWING SECTION 
 //TODO Move Drawbox from CFMANAGER
 //draw box decide color  and thickness based on teamid
 
-//let's use a boxstyle variable to decide between corner and full box
 
 void DrawBox(Vector2 position, float width, float height, ImColor color, float thickness = 1.0f, int boxStyle = 0) {
 	ImVec2 tl(position.x - width / 2, position.y - height / 2);
@@ -46,25 +47,15 @@ void DrawBox(Vector2 position, float width, float height, ImColor color, float t
 		ImGui::GetForegroundDrawList()->AddRect(tl, br, color, 0.0f, 0, thickness);
 	}
 }
-
- 
-
 void DrawHeadCircle(Vector2 position, float radius, ImColor color, float thickness = 3.0f) {
 	ImVec2 center(position.x, position.y - radius / 2);
 	//make the head circle much smaller
 	ImGui::GetForegroundDrawList()->AddCircle(center, radius / 2, color, 20, thickness);
 
 }
-
-
-void DrawTraceline(Vector2 start, Vector2 end, ImColor color, float thickness = 1.0f)
-{
-	ImVec2 p0(start.x, start.y);
-	ImVec2 p1(end.x, end.y);
-	ImGui::GetForegroundDrawList()->AddLine(p0, p1, color, thickness);
-	ImGui::GetForegroundDrawList()->AddCircleFilled(p1, 3.0f, color);
+void DrawTraceline(Vector2 start, Vector2 end, ImColor color, float thickness = 1.0f) {
+	ImGui::GetForegroundDrawList()->AddLine(ImVec2(start.x, start.y), ImVec2(end.x, end.y + 20), color, thickness);
 }
-
 void DrawDistanceText(Vector2 position, float distance, ImColor color)
 {
 	std::ostringstream ss;
@@ -75,7 +66,6 @@ void DrawDistanceText(Vector2 position, float distance, ImColor color)
 	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, ImVec2(tp.x + 1, tp.y + 1), ImColor(0, 0, 0, 150), txt.c_str());
 	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, tp, color, txt.c_str());
 }
-
 void DrawHealthBar(Vector2 position, float health, float width = 6.0f, float height = 60.0f)
 {
 	float pct = std::clamp(health / 100.0f, 0.0f, 1.0f);
@@ -84,9 +74,6 @@ void DrawHealthBar(Vector2 position, float health, float width = 6.0f, float hei
 	ImGui::GetForegroundDrawList()->AddRectFilled(base, ImVec2(base.x + width, base.y + height * pct), ImColor(0, 255, 0, 200));
 	ImGui::GetForegroundDrawList()->AddRect(base, ImVec2(base.x + width, base.y + height), ImColor(255, 255, 255, 200));
 }
-
-//reduce name size 
-
 void DrawNames(Vector2 position, const std::string& name, ImColor color)
 {
 	// Calculate text size using the explicit font and size
@@ -96,98 +83,37 @@ void DrawNames(Vector2 position, const std::string& name, ImColor color)
 	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, ImVec2(tp.x + 1, tp.y + 1), ImColor(0, 0, 0, 150), name.c_str());
 	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, tp, color, name.c_str());
 }
-
-void DrawItemESP(Vector2 position, const std::string& name, float distance, ImColor color)
+void DrawItemName(Vector2 position, const std::string& name, ImColor color)
 {
-	float w = 50.0f, h = 50.0f;
-	ImVec2 tl(position.x - w / 2, position.y - h / 2);
-
-	// Fixed font size for consistent text rendering
-	float fontSize = 16.0f;
-	ImVec2 ns = ImGui::CalcTextSize(name.c_str());
-	ImVec2 np(position.x - ns.x / 2, position.y - h / 2 - ns.y - 4); // Fixed offset above item
-
-	ImGui::GetForegroundDrawList()->AddText(nullptr, fontSize, np, color, name.c_str());
-
+	ImVec2 ts = ImGui::CalcTextSize(name.c_str());
+	ImVec2 tp(position.x - ts.x / 2, position.y - 30);
+	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, ImVec2(tp.x + 1, tp.y + 1), ImColor(0, 0, 0, 150), name.c_str());
+	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, tp, color, name.c_str());
+}
+void DrawItemBox(Vector2 position, float width, float height, ImColor color, float thickness = 1.0f) {
+	ImVec2 tl(position.x - width / 2, position.y - height / 2);
+	ImVec2 br(position.x + width / 2, position.y + height / 2);
+	ImGui::GetForegroundDrawList()->AddRect(tl, br, color, 0.0f, 0, thickness);
+}
+void DrawItemDistanceText(Vector2 position, float distance, ImColor color)
+{
 	std::ostringstream ss;
 	ss << std::fixed << std::setprecision(1) << distance << "m";
-	std::string dt = ss.str();
-
-	ImVec2 ds = ImGui::CalcTextSize(dt.c_str());
-	ImVec2 dp(position.x - ds.x / 2, position.y + h / 2 + 4); // Fixed offset below item
-
-	ImGui::GetForegroundDrawList()->AddText(nullptr, fontSize, dp, color, dt.c_str());
+	std::string txt = ss.str();
+	ImVec2 ts = ImGui::CalcTextSize(txt.c_str());
+	ImVec2 tp(position.x - ts.x / 2, position.y + 8);
+	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, ImVec2(tp.x + 1, tp.y + 1), ImColor(0, 0, 0, 150), txt.c_str());
+	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, tp, color, txt.c_str());
 }
 
 
-//MENU SECTION 
-
- 
-inline void DrawAimbotTab() {
-	if (ImGui::CollapsingHeader("Aimbot", ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		ImGui::Columns(2, nullptr, false);
-		ImGui::SetColumnOffset(1, 150);
-
-		// ── Enable aimbot
-		ImGui::Text("Enabled"); ImGui::NextColumn();
-		static bool aimbotEnabled = false;
-		ImGui::Checkbox("##aimbot", &aimbotEnabled);
-		HoverTooltip("Toggle the aimbot");
-		ImGui::NextColumn();
-
-		// ── FOV
-		ImGui::Text("FOV"); ImGui::NextColumn();
-		static float aimbotFov = 35.0f;
-		ImGui::SliderFloat("##fov", &aimbotFov, 5.0f, 180.0f, "%.0f");
-		HoverTooltip("Maximum angle from screen centre");
-		ImGui::NextColumn();
-
-		// ── Smooth
-		ImGui::Text("Smooth"); ImGui::NextColumn();
-		static float aimbotSmooth = 5.0f;
-		ImGui::SliderFloat("##smooth", &aimbotSmooth, 1.0f, 20.0f, "%.1f");
-		HoverTooltip("Higher = slower, smoother aim");
-		ImGui::NextColumn();
-
-		// ── Keybind
-		ImGui::Text("Keybind"); ImGui::NextColumn();
-		static int aimbotKey = VK_RBUTTON; // default right mouse button
-	 
-		HoverTooltip("Press to activate aimbot");
-		ImGui::NextColumn();
-
-		ImGui::Columns(1);
-		ImGui::Spacing();
-	}
-}
-
-
-inline void DrawMiscTab() {
-	ImGui::PushFont(Globals.headerFont); // Use header font for bigger text
-	ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "MISCELLANEOUS");
-	ImGui::PopFont();
-	ImGui::Separator();
-
-}
-
-void DrawColorsTab() {
-	ImGui::PushFont(Globals.headerFont); // Use header font for bigger text
-	ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "COLOR SETTINGS");
-	ImGui::PopFont();
-	ImGui::Separator();
-
-
-}
-
- 
 void DrawMainMenu() {
 	const char* tabs[] = { "Visuals", "Aimbot", "Misc", "Colors", "Settings" };
 	int tabCount = sizeof(tabs) / sizeof(tabs[0]);
 
 	float buttonHeight = 40.0f;
 	float totalButtonHeight = tabCount * buttonHeight;
-	float availableForButtons = ImGui::GetContentRegionAvail().y - 100; // Leave space for metrics
+	float availableForButtons = ImGui::GetContentRegionAvail().y - 100;  
 	float spacingBetweenButtons = (availableForButtons - totalButtonHeight) / (tabCount + 1);
 	spacingBetweenButtons = std::max(spacingBetweenButtons, 8.0f);
 
@@ -202,7 +128,7 @@ void DrawMainMenu() {
 
 		if (ImGui::Button(tabs[i], ImVec2(270, buttonHeight))) {
 			selectedTab = i;
-			currentPage = 1; // Navigate to sub-page
+			currentPage = 1; 
 		}
 
 		ImGui::PopStyleColor(3);
@@ -211,19 +137,18 @@ void DrawMainMenu() {
 
 	if (Globals.headerFont) ImGui::PopFont();
 }
-
-
 void DrawSidebar() {
 	static bool wasDownLastFrame = false;
 
 	bool isDown = (GetAsyncKeyState(Globals.OpenMenuKey) & 0x8000 || mem.GetKeyboard()->IsKeyDown(Globals.OpenMenuKey));
 
 	if (isDown && !wasDownLastFrame) {
-		sidebarOpen = !sidebarOpen;
+		Globals.sidebarOpen = !Globals.sidebarOpen;
+		set_mouse_passthrough(Globals.overlayHWND);
 	}
 	wasDownLastFrame = isDown;
 
-	if (!sidebarOpen) return;
+	if (!Globals.sidebarOpen) return;
 
 	ImGuiStyle& style = ImGui::GetStyle();
 	ImVec4 darkBg = Globals.bgColor;
@@ -246,7 +171,7 @@ void DrawSidebar() {
 		ImGuiWindowFlags_NoCollapse |
 		ImGuiWindowFlags_NoScrollbar);
 
-	// Logo and header (always shown)
+	 
 	if (Globals.logoTexture != 0) {
 		float contentWidth = ImGui::GetContentRegionAvail().x;
 		float texW = static_cast<float>(Globals.logoWidth);
@@ -269,7 +194,7 @@ void DrawSidebar() {
 	ImGui::Separator();
 	ImGui::Spacing();
 
-	// Title and subtitle
+	 
 	if (Globals.logoFont) {
 		ImGui::PushFont(Globals.logoFont);
 		const char* title = "Makimura.DeV";
@@ -294,23 +219,23 @@ void DrawSidebar() {
 	}
 
 	ImGui::Spacing();
-
-	// Main content area
+	//REMOVED COMMENTS..
+	 
 	float metricsHeight = 100.0f;
 	float availableHeight = ImGui::GetContentRegionAvail().y;
-	float mainContentHeight = availableHeight - metricsHeight - 60; // 60 for back button spacing
+	float mainContentHeight = availableHeight - metricsHeight - 60;  
 
 	ImGui::BeginChild("Content", ImVec2(0, mainContentHeight), false, ImGuiWindowFlags_NoScrollbar);
 
 	if (Globals.regularFont) ImGui::PushFont(Globals.regularFont);
 
-	// Page navigation logic
+	 
 	if (currentPage == 0) {
-		// Main menu page
+		 
 		DrawMainMenu();
 	}
 	else {
-		// Sub-pages
+	 
 		switch (selectedTab) {
 		case 0: DrawVisualsTab(); break;
 		case 1: DrawAimbotTab();  break;
@@ -323,7 +248,7 @@ void DrawSidebar() {
 	if (Globals.regularFont) ImGui::PopFont();
 	ImGui::EndChild();
 
-	// Back button (only show when not on main menu)
+	 
 	if (currentPage > 0) {
 		ImGui::Separator();
 		ImGui::Spacing();
@@ -349,14 +274,14 @@ void DrawSidebar() {
 		ImGui::SetCursorPosX((300.0f - buttonWidth) * 0.5f);
 
 		if (ImGui::Button("Back", ImVec2(buttonWidth, buttonHeight))) {
-			currentPage = 0; // Return to main menu
+			currentPage = 0; 
 		}
 
 		if (Globals.headerFont) ImGui::PopFont();
 		ImGui::PopStyleColor(3);
 	}
 
-	// Metrics display
+ 
 	ImGui::Separator();
 	ImGui::Spacing();
 
@@ -366,7 +291,7 @@ void DrawSidebar() {
 	ImGui::GetWindowDrawList()->AddRectFilled(
 		metricsStart,
 		ImVec2(metricsStart.x + metricsSize.x, metricsStart.y + metricsSize.y),
-		ImColor(Globals.headerColor),  // Use header color instead of hardcoded
+		ImColor(Globals.headerColor),  
 		4.0f
 	);
 
@@ -405,56 +330,80 @@ void DrawSidebar() {
 // --- RENDERING SECTION
 
 void Render::Loop() {
-	for (const PlayerRender& player : Globals.renderPlayers) {
+		auto* draw = ImGui::GetForegroundDrawList();
 
-
-		if (player.AliveDeadorKnocked == ECharacterHealthState::ECHS_Dead)
-			continue; //skip dead players
-
- 
-
-		float boxHeight = abs(player.headW2S.y - player.bottomW2S.y);
-		float boxWidth = boxHeight * 0.5f;
-
-		ImColor colour;
-		if (player.Health < 30.0f) {
-			colour = ImColor(255, 100, 100); // Light red for low health
+		if (Globals.settings.fov > 0) {
+			draw->AddCircle(
+				ImVec2(Globals.screenWidth / 2, Globals.screenHeight / 2),
+				Globals.settings.fov,
+				ImColor(Globals.ColorFOV), 
+				50,
+				Globals.LineThickness
+			);
 		}
-		else {
-			colour = ImColor(100, 255, 100); // Light green for healthy
+		for (const PlayerRender& player : Globals.renderPlayers) {
+			if (player.AliveDeadorKnocked == ECharacterHealthState::ECHS_Dead)
+				continue;
+
+			if (player.distance > Globals.maxDistance)
+				continue;
+
+			float boxHeight = fabs(player.headW2S.y - player.bottomW2S.y);
+			float boxWidth = boxHeight * 0.5f;
+
+			ImColor colour = (player.Health < 30.0f)
+				? Globals.ColorLowHP    // configurable low-hp color
+				: Globals.ColorPlayerBox; // configurable normal box color
+
+			if (Globals.ESPEnabled) {
+				DrawBox(Vector2(player.bottomW2S.x, (player.headW2S.y + player.bottomW2S.y) / 2),
+					boxWidth, boxHeight,
+					colour,
+					Globals.LineThickness,
+					Globals.BoxStyle);
+			}
+
+			if (Globals.DrawNames)
+				DrawNames(Vector2(player.headW2S.x, player.headW2S.y - 12),
+					player.Name, Globals.ColorName);
+
+			if (Globals.DrawBones)
+			//	DrawSkeleton(player.Skeleton, Globals.ColorBones, Globals.LineThickness);
+
+			if (Globals.DrawLowHP)
+				DrawHealthBar(Vector2(player.bottomW2S.x, player.bottomW2S.y - 12), player.Health);
+
+			if (Globals.DrawHeadCircle)
+				DrawHeadCircle(player.headW2S, boxWidth / 2, Globals.ColorHead, Globals.LineThickness);
+
+			if (Globals.DrawTraceline) {
+					Vector2 start{ static_cast<float>(Globals.screenWidth) * 0.5f, static_cast<float>(Globals.screenHeight) * 0.5f };
+					ImColor traceColor = ImColor(Globals.ColorLines);
+					DrawTraceline(start, Vector2(player.bottomW2S.x, player.bottomW2S.y), traceColor, Globals.LineThickness);
+				}
+
+			if (Globals.maxDistance)
+				DrawDistanceText(Vector2(player.bottomW2S.x, player.bottomW2S.y - 12),
+					player.distance, Globals.ColorDistance);
 		}
 
-		// Draw box
-
-		if(Globals.ESPEnabled)
-			DrawBox(Vector2(player.bottomW2S.x, (player.headW2S.y + player.bottomW2S.y) / 2), boxWidth, boxHeight, colour, 2.f, Globals.BoxStyle);
-
-		// Draw health bar
-	//	Vector2 healthBarPos(player.bottomW2S.x, player.bottomW2S.y - 12);
-		//DrawHealthBar(healthBarPos, player.Health);
-
-		// draw names 
-		DrawNames(Vector2(player.headW2S.x, player.headW2S.y - 12), player.Name, colour);
-
-		// Draw head circle
-		DrawHeadCircle(player.headW2S, boxWidth / 2, colour, 2.f);
-
-		//draw distance text
-		DrawDistanceText(Vector2(player.bottomW2S.x, player.bottomW2S.y - 12), player.distance, ImColor(255, 255, 255));
-
-		// Draw traceline
-		//DrawTraceline(Vector2(Globals.screenWidth / 2, Globals.screenHeight), Vector2(player.bottomW2S.x, player.bottomW2S.y), colour, 1.f);
-
-		ImGui::GetForegroundDrawList()->AddCircle(ImVec2(Globals.screenWidth / 2, Globals.screenHeight / 2), Globals.settings.fov, ImColor(255, 255, 255), 50, 1.f);
-		 
-	}
 
 	DrawSidebar();
-	//for now color will be white
 	for (const ItemRenderer& item : Globals.renderItems) {
-		if(Globals.itemsEnabled)
-		DrawItemESP(item.W2S, item.Name, item.distance, ImColor(255, 255, 255));
-		 
+		if (Globals.itemsEnabled)
+		{
+			if (item.distance > Globals.MaxItemDistance)
+				continue;
+			if (Globals.DrawItemName)
+				DrawItemName(item.W2S, item.Name, Globals.ColorItems);
+
+			if (Globals.DrawItemBox)
+				DrawItemBox(item.W2S, 50.0f, 20.0f, Globals.ColorItems);
+
+			DrawItemDistanceText(item.W2S, item.distance, ImColor(255, 255, 255));
+
+		}
+			 
 	}
 	 
 }
@@ -484,7 +433,7 @@ bool CreateDeviceD3D(HWND hWnd)
 	sd.BufferDesc.Width = 0;
 	sd.BufferDesc.Height = 0;
 	sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	sd.BufferDesc.RefreshRate.Numerator = 0;
+	sd.BufferDesc.RefreshRate.Numerator = 165;
 	sd.BufferDesc.RefreshRate.Denominator = 1;
 	sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -527,9 +476,9 @@ std::vector<unsigned char> LoadResourceData(int resourceId)
 	// 1️⃣  Find the resource – numeric type (RT_RCDATA) and *no* language filter
 	//     (generic FindResource automatically selects the right language).
 	HRSRC hRes = FindResource(
-		nullptr,                 // current module (the EXE)
-		MAKEINTRESOURCE(resourceId), // the numeric ID defined in resource.h
-		RT_RCDATA);              // numeric type = 10 (RCDATA)
+		nullptr,                 
+		MAKEINTRESOURCE(resourceId),  
+		RT_RCDATA);             
 
 	if (!hRes) {
 		std::cout << "FindResource failed for ID " << resourceId
@@ -537,7 +486,7 @@ std::vector<unsigned char> LoadResourceData(int resourceId)
 		return {};
 	}
 
-	// 2️⃣  Load the resource into memory.
+	 
 	HGLOBAL hGlob = LoadResource(nullptr, hRes);
 	if (!hGlob) return {};
 
@@ -545,7 +494,7 @@ std::vector<unsigned char> LoadResourceData(int resourceId)
 	const void* p = LockResource(hGlob);
 	if (!p || size == 0) return {};
 
-	// 3️⃣  Copy the raw bytes into a std::vector (our own copy).
+	 
 	const unsigned char* bytes = static_cast<const unsigned char*>(p);
 	return std::vector<unsigned char>(bytes, bytes + size);
 }
@@ -555,15 +504,16 @@ ImFont* LoadFontFromResource(int resourceId, float fontSize, ImGuiIO& io) {
 	std::vector<unsigned char> fontData = LoadResourceData(resourceId);
 	if (fontData.empty()) return nullptr;
 
-	// ImGui takes ownership of the data, so we need to allocate it
+	 
 	void* fontMemory = IM_ALLOC(fontData.size());
 	memcpy(fontMemory, fontData.data(), fontData.size());
 
 	ImFontConfig config;
-	config.FontDataOwnedByAtlas = true; // ImGui will free the memory
+	config.FontDataOwnedByAtlas = true;  
 
 	return io.Fonts->AddFontFromMemoryTTF(fontMemory, fontData.size(), fontSize, &config);
 }
+
 
 
 bool LoadTextureFromFile(const char* file_name, ID3D11ShaderResourceView** out_srv, int* out_width, int* out_height)
@@ -584,7 +534,7 @@ bool LoadTextureFromFile(const char* file_name, ID3D11ShaderResourceView** out_s
 	fread(file_data, 1, file_size, f);
 	fclose(f);
 
-	// Load from disk into a raw RGBA buffer
+ 
 	int image_width = 0;
 	int image_height = 0;
 	unsigned char* image_data = stbi_load_from_memory((const unsigned char*)file_data, (int)file_size, &image_width, &image_height, NULL, 4);
@@ -593,7 +543,7 @@ bool LoadTextureFromFile(const char* file_name, ID3D11ShaderResourceView** out_s
 	if (image_data == NULL)
 		return false;
 
-	// Create texture
+ 
 	D3D11_TEXTURE2D_DESC desc;
 	ZeroMemory(&desc, sizeof(desc));
 	desc.Width = image_width;
@@ -618,7 +568,7 @@ bool LoadTextureFromFile(const char* file_name, ID3D11ShaderResourceView** out_s
 		return false;
 	}
 
-	// Create texture view
+ 
 	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
 	ZeroMemory(&srvDesc, sizeof(srvDesc));
 	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -639,14 +589,14 @@ bool LoadTextureFromResource(int resourceId, ID3D11ShaderResourceView** out_srv,
 	std::vector<unsigned char> imageData = LoadResourceData(resourceId);
 	if (imageData.empty()) return false;
 
-	// Load from memory using stbi
+	 
 	int image_width = 0;
 	int image_height = 0;
 	unsigned char* decoded_data = stbi_load_from_memory(imageData.data(), imageData.size(), &image_width, &image_height, NULL, 4);
 
 	if (decoded_data == NULL) return false;
 
-	// Create texture (same as your existing code)
+	 
 	D3D11_TEXTURE2D_DESC desc;
 	ZeroMemory(&desc, sizeof(desc));
 	desc.Width = image_width;
@@ -671,7 +621,7 @@ bool LoadTextureFromResource(int resourceId, ID3D11ShaderResourceView** out_srv,
 		return false;
 	}
 
-	// Create texture view
+ 
 	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
 	ZeroMemory(&srvDesc, sizeof(srvDesc));
 	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -689,6 +639,110 @@ bool LoadTextureFromResource(int resourceId, ID3D11ShaderResourceView** out_srv,
 	return SUCCEEDED(hr);
 }
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+
+inline BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData) {
+	MONITORINFOEX monitorInfo = {};
+	monitorInfo.cbSize = sizeof(MONITORINFOEX);
+
+	if (GetMonitorInfo(hMonitor, &monitorInfo)) {
+		if (Globals.monitor_enum_state != Globals.target_monitor) {
+			Globals.monitor_enum_state++;
+			return TRUE;
+		}
+
+		HWND hwnd = reinterpret_cast<HWND>(dwData);
+
+
+		SetWindowPos(hwnd, NULL, monitorInfo.rcMonitor.left,
+			monitorInfo.rcMonitor.top,
+			monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
+			monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top,
+			SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE);
+
+
+		SetOverlayProperties(Globals.overlayHWND, Globals.OpenMenuKey, Globals.overlayMode);
+
+		return FALSE;
+	}
+	return TRUE;
+}
+  void  set_monitor(int index, HWND hwnd) {
+	Globals.target_monitor = index;
+	Globals.monitor_enum_state = 0;
+	EnumDisplayMonitors(NULL, NULL, MonitorEnumProc,
+		reinterpret_cast<LPARAM>(hwnd));
+}
+
+ void SetOverlayProperties(HWND hwnd, bool showMenu, int overlayMode)
+{
+	LONG style = GetWindowLong(hwnd, GWL_EXSTYLE);
+
+	// Always keep TOOLWINDOW to hide from taskbar
+	style |= WS_EX_TOOLWINDOW;
+
+	if (overlayMode == 0) {
+		// Transparent Mode
+
+
+		MARGINS margins = { 0, 0, Globals.screenWidth, Globals.screenHeight };
+		DwmExtendFrameIntoClientArea(hwnd, &margins);
+
+		if (showMenu) {
+			style &= ~WS_EX_LAYERED;
+			style &= ~WS_EX_TRANSPARENT;  // Capture mouse for menu interaction
+			style &= ~WS_EX_NOACTIVATE;   // Allow keyboard focus
+
+			SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+				SWP_NOMOVE | SWP_NOSIZE);
+		}
+		else {
+			style |= WS_EX_LAYERED;
+			style |= WS_EX_TRANSPARENT;   // Allow clicks to pass through to game
+			style |= WS_EX_NOACTIVATE;    // Prevent focus stealing
+
+			// Keep TOPMOST so ESP remains visible over game
+			SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+				SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+		}
+	}
+	else {
+		// Fuser Mode
+		style &= ~WS_EX_LAYERED;  // No transparency for black background
+
+		MARGINS margins = { 0, 0, 0, 0 };
+		DwmExtendFrameIntoClientArea(hwnd, &margins);
+
+		if (showMenu) {
+			// When menu is visible:
+			style &= ~WS_EX_TRANSPARENT;  // Capture mouse
+			style &= ~WS_EX_NOACTIVATE;   // Allow keyboard focus
+
+			SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+				SWP_NOMOVE | SWP_NOSIZE);
+		}
+		else {
+			// When menu is hidden:
+			style |= WS_EX_TRANSPARENT;   // Pass mouse clicks
+			style |= WS_EX_NOACTIVATE;    // Prevent focus stealing
+
+			SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+				SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+		}
+	}
+
+	SetWindowLong(hwnd, GWL_EXSTYLE, style);
+}
+
+   void set_mouse_passthrough(HWND hwnd) {
+	 SetOverlayProperties(hwnd, Globals.sidebarOpen, Globals.overlayMode);
+ }
+
+ inline void EnableGlassTransparency(HWND hwnd, bool enable) {
+	 Globals.overlayMode = enable ? 0 : 1;
+	 SetOverlayProperties(hwnd, Globals.sidebarOpen, Globals.overlayMode);
+ }
+
 void Render::Init() {
 	// Create application window
 	//ImGui_ImplWin32_EnableDpiAwareness();
@@ -698,15 +752,24 @@ void Render::Init() {
 	Globals.screenWidth = GetSystemMetrics(SM_CXSCREEN);
 	Globals.screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
-	HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"Overlay",
-		WS_POPUP | WS_EX_TOOLWINDOW, 0, 0, Globals.screenWidth, Globals.screenHeight,
+	HWND hwnd = CreateWindowExW(
+		WS_EX_TOOLWINDOW,
+		wc.lpszClassName,
+		L"Makimura",
+		WS_POPUP,
+		0, 0,
+		Globals.screenWidth,
+		Globals.screenHeight,
 		nullptr, nullptr, wc.hInstance, nullptr);
-	LONG style = GetWindowLong(hwnd, GWL_STYLE);
-	style &= ~WS_CAPTION; // Remove title bar
-	style &= ~WS_THICKFRAME; // Remove borders
-	SetWindowLong(hwnd, GWL_STYLE, style);
 
-	// Initialize Direct3D
+
+	Globals.overlayHWND = hwnd;
+
+	EnableGlassTransparency(Globals.overlayHWND, true);
+
+	set_monitor(0, Globals.overlayHWND);
+
+	 
 	if (!CreateDeviceD3D(hwnd))
 	{
 		CleanupDeviceD3D();
@@ -714,28 +777,28 @@ void Render::Init() {
 		return;
 	}
 
-	// Show the window
+ 
 	::ShowWindow(hwnd, SW_SHOWDEFAULT);
 	::UpdateWindow(hwnd);
 
-	// Setup Dear ImGui context
+ 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
-	// Load custom fonts with enhanced sizes for better visibility
-	Globals.logoFont = LoadFontFromResource(IDR_FONT1, 32.0f, io); // Increased from 28.0f
-	Globals.headerFont = LoadFontFromResource(IDR_FONT2, 22.0f, io); // Increased from 16.0f
-	Globals.regularFont = LoadFontFromResource(IDR_FONT3, 19.0f, io); // Increased from 14.0f
+	 
+	Globals.logoFont = LoadFontFromResource(IDR_FONT1, 32.0f, io); 
+	Globals.headerFont = LoadFontFromResource(IDR_FONT2, 22.0f, io); 
+	Globals.regularFont = LoadFontFromResource(IDR_FONT3, 19.0f, io);  
 
-	// Fallback to default if loading fails
+ 
 	if (!Globals.logoFont) Globals.logoFont = io.Fonts->AddFontDefault();
 	if (!Globals.headerFont) Globals.headerFont = io.Fonts->AddFontDefault();
 	if (!Globals.regularFont) Globals.regularFont = io.Fonts->AddFontDefault();
 
-	// Load logo texture (place image in "images" folder)
+	 
 	ID3D11ShaderResourceView* my_texture = NULL;
 	int my_image_width = 0;
 	int my_image_height = 0;
@@ -755,19 +818,18 @@ void Render::Init() {
 		Globals.logoHeight = 0;
 	}
 
-	// Setup Dear ImGui style
+ 
 	ImGui::StyleColorsDark();
-	//ImGui::StyleColorsLight();
+	 
 
-	// Setup Platform/Renderer backends
+	 
 	ImGui_ImplWin32_Init(hwnd);
 	ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
 
 	bool show_demo_window = true;
 	bool show_another_window = false;
-	ImVec4 clear_color = ImVec4(0.f, 0.f, 0.f, 0.f);
-
-	// Main loop
+	 
+ 
 	bool done = false;
 	while (!done)
 	{
@@ -810,14 +872,17 @@ void Render::Init() {
 
 		// Rendering
 		ImGui::Render();
+
+		const ImVec4 clear_color = ImVec4(0.f, 0.f, 0.f, 1.00f);
+		 
 		const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
 		g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
 		g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear_color_with_alpha);
 		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
 		// Present
-		//HRESULT hr = g_pSwapChain->Present(1, 0);   // Present with vsync
-		HRESULT hr = g_pSwapChain->Present(0, 0); // Present without vsync
+		HRESULT hr = g_pSwapChain->Present(0, 0);   // Present with vsync
+		//HRESULT hr = g_pSwapChain->Present(0, 0); // Present without vsync
 		g_SwapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
 	}
 
@@ -832,6 +897,10 @@ void Render::Init() {
 
 	return;
 }
+
+
+ 
+
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 

@@ -55,7 +55,6 @@ init:
 		return 1;
 	}
 
-
 	std::cout << "Kmbox initialized" << std::endl;
 
 
