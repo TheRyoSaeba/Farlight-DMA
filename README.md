@@ -1,10 +1,12 @@
 # Farlight 84 DMA
 
-My First  WIP Attempt at an unreal Engine Cheat coming from Crossfire...
+My ~~First~~  WIP Attempt at an unreal Engine Cheat ...
 
 Very Messy...
 Originally was working on Marvel Rivals Based on Base from [Rivals DMA](https://github.com/boggymc/MarvelRivals-DMA)
-But i got Banned, Then i had a Delta Force ESP going before ban and encryption same for ABI... So i decided to use farlight
+But i got Banned, Then i had a Delta Force ESP going before ban and encryption same for ABI... So i decided to use farlight , this was the second version i made.
+
+
 
 ## Completed
 - Basic ESP
