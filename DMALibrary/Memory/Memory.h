@@ -327,6 +327,7 @@ public:
 	void MemoryPartialRefresh();
 	void TLBRPartialefresh();
 	void FullRefresh();
+	void process_time();
 
 	/*the FPGA handle*/
 	VMM_HANDLE vHandle;

@@ -39,6 +39,7 @@
       <Filter>Utils</Filter>
     </ClCompile>
     <ClCompile Include="Cache\ItemESP.cpp" />
+    <ClCompile Include="Overlay\Menu.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Aimbot\Aimbot.h">
@@ -93,6 +94,7 @@
     <ClInclude Include="ImGUI\D3DX11tex.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Cache\ItemESP.h" />
+    <ClInclude Include="Overlay\Menu.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Aimbot">

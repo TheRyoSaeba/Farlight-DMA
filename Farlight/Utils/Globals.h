@@ -25,7 +25,7 @@ inline namespace FarlightDMA {
         bool ESPEnabled = true;
 		bool DrawHeadCircle = true;
 		bool DrawBones = true;
-		bool DrawLowHP = true;
+		bool DrawHP = false;
 		bool DrawNames = true;
 		bool DrawTraceline = false;
         bool itemsEnabled = true;
@@ -57,7 +57,7 @@ inline namespace FarlightDMA {
         ImVec4 ColorName = ImVec4(1.0f, 1.0f, 0.6f, 1.0f); // yellowish
         ImVec4 ColorDistance = ImVec4(0.8f, 0.8f, 0.8f, 1.0f); // grey
         ImVec4 ColorHead = ImVec4(0.6f, 0.6f, 1.0f, 1.0f); // bluish
-        ImVec4 ColorLowHP = ImVec4(1.0f, 0.3f, 0.3f, 1.0f); // red
+        ImVec4 ColorHP = ImVec4(1.0f, 0.3f, 0.3f, 1.0f); // red
         ImVec4 ColorItems = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // white
         ImVec4 ColorWeapons = ImVec4(1.0f, 0.5f, 0.2f, 1.0f); // orange
         ImVec4 ColorFOV = ImVec4(1.0f, 1.0f, 1.0f, 0.8f); // white (slightly transparent)
@@ -113,8 +113,9 @@ inline namespace FarlightDMA {
 			uintptr_t defaultFov = 0x0;
 			uintptr_t ASolarTeamInfo = 0xf50;
 			uintptr_t teamState = 0x2f0;
-			uintptr_t   CharacterHealthState = 0x1f21 ;
-			uintptr_t heroID = 0x0;
+			uintptr_t CharacterHealthState = 0x1f21;
+            uintptr_t Actor_State = 0x2f8;
+			uintptr_t AbilitySystemComponent = 0x650;
 			uintptr_t mesh = 0x338;  /*// Inheritance: APawn > AActor > UObjectnamespace ACharacter {*/
 			uintptr_t lastSubmitTime = 0x0;
 			uintptr_t lastRenderTime = 0x0;
@@ -143,22 +144,20 @@ inline namespace FarlightDMA {
 }
 
 inline std::string GetNameFromFName(int id) {
-	auto base = mem.GetBaseDaddy(Globals.processName);
-	auto chunk = (uint32_t)((int)(id) >> 16);
-	auto name = (uint16_t)id;
-	auto poolChunk = mem.Read<uint64_t>(mem.baseAddress + Globals.offsets.GNAMES + ((chunk + 2) * 8));
-	auto entryOffset = poolChunk + (uint32_t)(2 * name);
-	auto nameEntry = mem.Read<int16_t>(entryOffset);
-	auto nameLength = nameEntry >> 6;
-	char buff[1028];
-	if ((uint32_t)nameLength && nameLength > 0) {
-		mem.Read(entryOffset + 2, buff, nameLength);
-		buff[nameLength] = '\0';
-		return std::string(buff);
-	}
-	else return "";
+    auto chunk = (uint32_t)((int)(id) >> 16);
+    auto name = (uint16_t)id;
+    auto poolChunk = mem.Read<uint64_t>(mem.baseAddress + Globals.offsets.GNAMES + ((chunk + 2) * 8));
+    auto entryOffset = poolChunk + (uint32_t)(2 * name);
+    auto nameEntry = mem.Read<int16_t>(entryOffset);
+    auto nameLength = nameEntry >> 6;
+    char buff[1028];
+    if ((uint32_t)nameLength && nameLength > 0) {
+        mem.Read(entryOffset + 2, buff, nameLength);
+        buff[nameLength] = '\0';
+        return std::string(buff);
+    }
+    else return "";
 }
-
  
 inline void DumpGame() {
     while (true) {

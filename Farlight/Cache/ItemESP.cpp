@@ -26,37 +26,39 @@ void ItemESP::Stop() {
     }
 }
 
+
 void ItemESP::UpdateLoop() {
     extern struct _GameCache cache;
 
     while (running) {
         if (!Globals.itemsEnabled) {
-            // Clear items when disabled - but don't clear cache.Items
-            {
-                std::unique_lock lock(Globals.itemMutex);
-                Globals.renderItems.clear();
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+            std::unique_lock lock(Globals.itemMutex);
+            Globals.renderItems.clear();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             continue;
         }
 
-        if (util::IsValidVA(cache.CameraManager.load())) {
-            std::vector<ItemEntry> items;
-            Camera localCam;
-
-            // Single atomic read to prevent race conditions
-            {
-                std::unique_lock lock(cache.cacheMutex);
-                items = cache.Items;
-            }
-            localCam = cache.LocalCamera; // This doesn't need mutex in your original code
-
-            Update(items, localCam, Globals.screenWidth, Globals.screenHeight);
+        
+        if (!util::IsValidVA(cache.CameraManager.load()) || !util::IsValidVA(cache.LocalPawn.load())) {
+            std::unique_lock lock(Globals.itemMutex);
+            Globals.renderItems.clear();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            continue;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(50)); // Reduced frequency to reduce flicker
+
+       
+        std::vector<ItemEntry> currentItems;
+        Camera localCam;
+        {
+            std::unique_lock lock(cache.cacheMutex);
+            currentItems = cache.Items;
+            localCam = cache.LocalCamera;
+        }
+
+        Update(currentItems, localCam, Globals.screenWidth, Globals.screenHeight);
+        std::this_thread::sleep_for(std::chrono::milliseconds(50)); // 20fps updates
     }
 }
-
 void ItemESP::Update(const std::vector<ItemEntry>& items, const Camera& cam, int screenW, int screenH) {
     std::unordered_set<uintptr_t> newItemSet;
 

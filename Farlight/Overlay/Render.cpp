@@ -1,4 +1,6 @@
-﻿#define STB_IMAGE_IMPLEMENTATION
+﻿#pragma warning (disable : 4995)
+
+#define STB_IMAGE_IMPLEMENTATION
 #define NOMINMAX
 #include <Overlay/Render.h>
 #include <Utils/Globals.h>
@@ -17,7 +19,8 @@
 #include <resource.h>
 #include <DMALibrary/Memory/Memory.h>
 
-static HWND g_hOverlayWnd = nullptr;
+
+void DrawSidebar();
 
 //DRAWING SECTION 
 //TODO Move Drawbox from CFMANAGER
@@ -58,21 +61,44 @@ void DrawTraceline(Vector2 start, Vector2 end, ImColor color, float thickness = 
 }
 void DrawDistanceText(Vector2 position, float distance, ImColor color)
 {
-	std::ostringstream ss;
-	ss << std::fixed << std::setprecision(1) << distance << "m";
-	std::string txt = ss.str();
+	// Subtract 4 meters from the reported distance, clamp to zero
+	float adjustedDistance = distance - 4.0f;
+	if (adjustedDistance < 0.0f) adjustedDistance = 0.0f;
+
+	int meters = static_cast<int>(std::lround(adjustedDistance));
+	std::string txt = "[" + std::to_string(meters) + "M]";
+
 	ImVec2 ts = ImGui::CalcTextSize(txt.c_str());
-	ImVec2 tp(position.x - ts.x / 2, position.y + 8);
-	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, ImVec2(tp.x + 1, tp.y + 1), ImColor(0, 0, 0, 150), txt.c_str());
-	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, tp, color, txt.c_str());
+	constexpr float verticalOffset = 1.0f;
+	ImVec2 tp(position.x - ts.x / 2.0f, position.y + verticalOffset);
+	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 16.0f, ImVec2(tp.x + 1, tp.y + 1), ImColor(0, 0, 0, 150), txt.c_str());
+	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 16.0f, tp, color, txt.c_str());
 }
-void DrawHealthBar(Vector2 position, float health, float width = 6.0f, float height = 60.0f)
+void DrawHealthBar(Vector2 center, float health, float width = 6.0f, float height = 60.0f)
 {
-	float pct = std::clamp(health / 100.0f, 0.0f, 1.0f);
-	ImVec2 base(position.x - width - 4, position.y - height / 2);
-	ImGui::GetForegroundDrawList()->AddRectFilled(base, ImVec2(base.x + width, base.y + height), ImColor(0, 0, 0, 150));
-	ImGui::GetForegroundDrawList()->AddRectFilled(base, ImVec2(base.x + width, base.y + height * pct), ImColor(0, 255, 0, 200));
-	ImGui::GetForegroundDrawList()->AddRect(base, ImVec2(base.x + width, base.y + height), ImColor(255, 255, 255, 200));
+	float pct = std::clamp(health / 150.0f, 0.0f, 1.0f);
+
+	ImColor fillColor;
+	if (pct > 0.66f) {
+		fillColor = ImColor(0, 220, 0, 220);
+	}
+	else if (pct > 0.33f) {
+		fillColor = ImColor(255, 165, 0, 220); 
+	}
+	else {
+		fillColor = ImColor(220, 20, 20, 220);
+	}
+	ImVec2 tl(center.x - width / 2.0f, center.y - height / 2.0f);
+	ImVec2 br(center.x + width / 2.0f, center.y + height / 2.0f);
+	ImGui::GetForegroundDrawList()->AddRectFilled(tl, br, ImColor(0, 0, 0, 140));
+
+	float filledTopY = tl.y + height * (1.0f - pct);
+	ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(tl.x, filledTopY), ImVec2(br.x, br.y), fillColor);
+
+	ImGui::GetForegroundDrawList()->AddRect(tl, br, ImColor(255, 255, 255, 200));
+	ImGui::GetForegroundDrawList()->AddRect(ImVec2(tl.x + 1.0f, tl.y + 1.0f),
+		ImVec2(br.x - 1.0f, br.y - 1.0f),
+		ImColor(0, 0, 0, 60));
 }
 void DrawNames(Vector2 position, const std::string& name, ImColor color)
 {
@@ -83,17 +109,21 @@ void DrawNames(Vector2 position, const std::string& name, ImColor color)
 	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, ImVec2(tp.x + 1, tp.y + 1), ImColor(0, 0, 0, 150), name.c_str());
 	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, tp, color, name.c_str());
 }
-void DrawItemName(Vector2 position, const std::string& name, ImColor color)
+void DrawItemName(Vector2 position, const std::string& name, ImVec4 color)
 {
+	ImU32 col = ImGui::GetColorU32(color);
+	ImU32 shadow = ImGui::GetColorU32(ImVec4(0, 0, 0, 0.6f));
 	ImVec2 ts = ImGui::CalcTextSize(name.c_str());
 	ImVec2 tp(position.x - ts.x / 2, position.y - 30);
-	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, ImVec2(tp.x + 1, tp.y + 1), ImColor(0, 0, 0, 150), name.c_str());
-	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, tp, color, name.c_str());
+	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, ImVec2(tp.x + 1, tp.y + 1), shadow, name.c_str());
+	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, tp, col, name.c_str());
 }
-void DrawItemBox(Vector2 position, float width, float height, ImColor color, float thickness = 1.0f) {
+
+void DrawItemBox(Vector2 position, float width, float height, ImVec4 color, float thickness = 1.0f) {
+	ImU32 col = ImGui::GetColorU32(color);
 	ImVec2 tl(position.x - width / 2, position.y - height / 2);
 	ImVec2 br(position.x + width / 2, position.y + height / 2);
-	ImGui::GetForegroundDrawList()->AddRect(tl, br, color, 0.0f, 0, thickness);
+	ImGui::GetForegroundDrawList()->AddRect(tl, br, col, 0.0f, 0, thickness);
 }
 void DrawItemDistanceText(Vector2 position, float distance, ImColor color)
 {
@@ -104,226 +134,6 @@ void DrawItemDistanceText(Vector2 position, float distance, ImColor color)
 	ImVec2 tp(position.x - ts.x / 2, position.y + 8);
 	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, ImVec2(tp.x + 1, tp.y + 1), ImColor(0, 0, 0, 150), txt.c_str());
 	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, tp, color, txt.c_str());
-}
-
-
-void DrawMainMenu() {
-	const char* tabs[] = { "Visuals", "Aimbot", "Misc", "Colors", "Settings" };
-	int tabCount = sizeof(tabs) / sizeof(tabs[0]);
-
-	float buttonHeight = 40.0f;
-	float totalButtonHeight = tabCount * buttonHeight;
-	float availableForButtons = ImGui::GetContentRegionAvail().y - 100;  
-	float spacingBetweenButtons = (availableForButtons - totalButtonHeight) / (tabCount + 1);
-	spacingBetweenButtons = std::max(spacingBetweenButtons, 8.0f);
-
-	ImGui::Dummy(ImVec2(0, spacingBetweenButtons * 0.6f));
-
-	if (Globals.headerFont) ImGui::PushFont(Globals.headerFont);
-
-	for (int i = 0; i < tabCount; ++i) {
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.5f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
-
-		if (ImGui::Button(tabs[i], ImVec2(270, buttonHeight))) {
-			selectedTab = i;
-			currentPage = 1; 
-		}
-
-		ImGui::PopStyleColor(3);
-		ImGui::Dummy(ImVec2(0, spacingBetweenButtons * 0.7f));
-	}
-
-	if (Globals.headerFont) ImGui::PopFont();
-}
-void DrawSidebar() {
-	static bool wasDownLastFrame = false;
-
-	bool isDown = (GetAsyncKeyState(Globals.OpenMenuKey) & 0x8000 || mem.GetKeyboard()->IsKeyDown(Globals.OpenMenuKey));
-
-	if (isDown && !wasDownLastFrame) {
-		Globals.sidebarOpen = !Globals.sidebarOpen;
-		set_mouse_passthrough(Globals.overlayHWND);
-	}
-	wasDownLastFrame = isDown;
-
-	if (!Globals.sidebarOpen) return;
-
-	ImGuiStyle& style = ImGui::GetStyle();
-	ImVec4 darkBg = Globals.bgColor;
-	ImVec4 sectionBg = Globals.headerColor;
-	ImVec4 accentRed = Globals.menuAccentColor;  
-
-	ImGui::SetNextWindowPos(ImVec2(Globals.screenWidth - 300, 0), ImGuiCond_Always);
-	ImGui::SetNextWindowSize(ImVec2(300, Globals.screenHeight), ImGuiCond_Always);
-
-	ImGui::PushStyleColor(ImGuiCol_WindowBg, darkBg);
-	ImGui::PushStyleColor(ImGuiCol_Border, accentRed);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18, 18));
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 7.0f);
-
-	ImGui::Begin("##Sidebar", nullptr,
-		ImGuiWindowFlags_NoTitleBar |
-		ImGuiWindowFlags_NoResize |
-		ImGuiWindowFlags_NoMove |
-		ImGuiWindowFlags_NoCollapse |
-		ImGuiWindowFlags_NoScrollbar);
-
-	 
-	if (Globals.logoTexture != 0) {
-		float contentWidth = ImGui::GetContentRegionAvail().x;
-		float texW = static_cast<float>(Globals.logoWidth);
-		float texH = static_cast<float>(Globals.logoHeight);
-		if (texW <= 0 || texH <= 0) { texW = 1080.0f; texH = 608.0f; }
-
-		const float maxHeight = 150.0f;
-		const float maxWidth = contentWidth;
-		float scale = std::min(maxWidth / texW, maxHeight / texH);
-		float drawW = texW * scale;
-		float drawH = texH * scale;
-
-		ImGui::Dummy(ImVec2(0, 8));
-		float offsetX = (contentWidth - drawW) * 0.5f;
-		ImGui::SetCursorPosX(offsetX);
-		ImGui::Image(Globals.logoTexture, ImVec2(drawW, drawH));
-		ImGui::Dummy(ImVec2(0, 8));
-	}
-
-	ImGui::Separator();
-	ImGui::Spacing();
-
-	 
-	if (Globals.logoFont) {
-		ImGui::PushFont(Globals.logoFont);
-		const char* title = "Makimura.DeV";
-		float txtW = ImGui::CalcTextSize(title).x;
-		ImGui::SetCursorPosX((300.0f - txtW) * 0.5f);
-		ImGui::TextColored(accentRed, "%s", title);
-		ImGui::PopFont();
-	}
-	else {
-		ImGui::SetCursorPosX((300.0f - ImGui::CalcTextSize("Makimura.dev[Fallback]").x) * 0.5f);
-		ImGui::TextColored(accentRed, "Makimura.Dev[Fallback]");
-	}
-
-	ImGui::Spacing();
-	if (Globals.headerFont) {
-		ImGui::PushFont(Globals.headerFont);
-		const char* sub = "Farlight Manager";
-		float subW = ImGui::CalcTextSize(sub).x;
-		ImGui::SetCursorPosX((300.0f - subW) * 0.5f);
-		ImGui::TextColored(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%s", sub);
-		ImGui::PopFont();
-	}
-
-	ImGui::Spacing();
-	//REMOVED COMMENTS..
-	 
-	float metricsHeight = 100.0f;
-	float availableHeight = ImGui::GetContentRegionAvail().y;
-	float mainContentHeight = availableHeight - metricsHeight - 60;  
-
-	ImGui::BeginChild("Content", ImVec2(0, mainContentHeight), false, ImGuiWindowFlags_NoScrollbar);
-
-	if (Globals.regularFont) ImGui::PushFont(Globals.regularFont);
-
-	 
-	if (currentPage == 0) {
-		 
-		DrawMainMenu();
-	}
-	else {
-	 
-		switch (selectedTab) {
-		case 0: DrawVisualsTab(); break;
-		case 1: DrawAimbotTab();  break;
-		case 2: DrawMiscTab();    break;
-		case 3: DrawColorsTab();  break;
-		case 4: DrawSettingsTab(); break;
-		}
-	}
-
-	if (Globals.regularFont) ImGui::PopFont();
-	ImGui::EndChild();
-
-	 
-	if (currentPage > 0) {
-		ImGui::Separator();
-		ImGui::Spacing();
-
-		ImGui::PushStyleColor(ImGuiCol_Button, Globals.headerColor);
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(
-			Globals.headerColor.x * 1.2f,
-			Globals.headerColor.y * 1.2f,
-			Globals.headerColor.z * 1.2f,
-			Globals.headerColor.w
-		));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(
-			Globals.headerColor.x * 0.8f,
-			Globals.headerColor.y * 0.8f,
-			Globals.headerColor.z * 0.8f,
-			Globals.headerColor.w
-		));
-
-		if (Globals.headerFont) ImGui::PushFont(Globals.headerFont);
-
-		float buttonWidth = 270;
-		float buttonHeight = 40.0f;
-		ImGui::SetCursorPosX((300.0f - buttonWidth) * 0.5f);
-
-		if (ImGui::Button("Back", ImVec2(buttonWidth, buttonHeight))) {
-			currentPage = 0; 
-		}
-
-		if (Globals.headerFont) ImGui::PopFont();
-		ImGui::PopStyleColor(3);
-	}
-
- 
-	ImGui::Separator();
-	ImGui::Spacing();
-
-	ImVec2 metricsStart = ImGui::GetCursorScreenPos();
-	ImVec2 metricsSize = ImVec2(264, 70);
-
-	ImGui::GetWindowDrawList()->AddRectFilled(
-		metricsStart,
-		ImVec2(metricsStart.x + metricsSize.x, metricsStart.y + metricsSize.y),
-		ImColor(Globals.headerColor),  
-		4.0f
-	);
-
-	ImGui::GetWindowDrawList()->AddRect(
-		metricsStart,
-		ImVec2(metricsStart.x + metricsSize.x, metricsStart.y + metricsSize.y),
-		ImColor(accentRed),
-		4.0f,
-		0,
-		2.0f
-	);
-
-	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10);
-
-	if (Globals.regularFont) ImGui::PushFont(Globals.regularFont);
-
-	std::ostringstream renderFpsStream;
-	renderFpsStream << std::fixed << std::setprecision(0) << "OVERLAY: " << ImGui::GetIO().Framerate << " FPS";
-	std::string renderFpsText = renderFpsStream.str();
-
-	ImGui::SetCursorPosX((300.0f - ImGui::CalcTextSize(renderFpsText.c_str()).x) * 0.5f);
-	ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.5f, 1.0f), "%s", renderFpsText.c_str());
-
-	std::string gameFpsText = "DMA: " + std::to_string(Globals.readFPS) + " FPS";
-	ImGui::SetCursorPosX((300.0f - ImGui::CalcTextSize(gameFpsText.c_str()).x) * 0.5f);
-	ImGui::TextColored(ImVec4(0.4f, 0.8f, 178.0f, 1.0f), "%s", gameFpsText.c_str());
-
-	if (Globals.regularFont) ImGui::PopFont();
-
-	ImGui::End();
-	ImGui::PopStyleVar(3);
-	ImGui::PopStyleColor(2);
 }
 
 
@@ -344,21 +154,17 @@ void Render::Loop() {
 		for (const PlayerRender& player : Globals.renderPlayers) {
 			if (player.AliveDeadorKnocked == ECharacterHealthState::ECHS_Dead)
 				continue;
-
-			if (player.distance > Globals.maxDistance)
-				continue;
+			 
 
 			float boxHeight = fabs(player.headW2S.y - player.bottomW2S.y);
 			float boxWidth = boxHeight * 0.5f;
 
-			ImColor colour = (player.Health < 30.0f)
-				? Globals.ColorLowHP    // configurable low-hp color
-				: Globals.ColorPlayerBox; // configurable normal box color
+                
 
 			if (Globals.ESPEnabled) {
 				DrawBox(Vector2(player.bottomW2S.x, (player.headW2S.y + player.bottomW2S.y) / 2),
 					boxWidth, boxHeight,
-					colour,
+					Globals.ColorPlayerBox,
 					Globals.LineThickness,
 					Globals.BoxStyle);
 			}
@@ -367,27 +173,38 @@ void Render::Loop() {
 				DrawNames(Vector2(player.headW2S.x, player.headW2S.y - 12),
 					player.Name, Globals.ColorName);
 
+			 
+
 			if (Globals.DrawBones)
 			//	DrawSkeleton(player.Skeleton, Globals.ColorBones, Globals.LineThickness);
 
-			if (Globals.DrawLowHP)
-				DrawHealthBar(Vector2(player.bottomW2S.x, player.bottomW2S.y - 12), player.Health);
+				if (Globals.DrawHP) {
+					float boxCenterY = (player.headW2S.y + player.bottomW2S.y) / 2.0f;
+					float boxLeft = player.bottomW2S.x - (boxWidth / 2.0f);
+					const float barWidth = 6.0f;
+					const float gap = 6.0f; // gap between box and bar
+					Vector2 barCenter;
+					barCenter.x = boxLeft - gap - (barWidth / 2.0f);
+					barCenter.y = boxCenterY;
+					DrawHealthBar(barCenter, player.Health, barWidth, boxHeight);
+				}
 
 			if (Globals.DrawHeadCircle)
 				DrawHeadCircle(player.headW2S, boxWidth / 2, Globals.ColorHead, Globals.LineThickness);
 
 			if (Globals.DrawTraceline) {
-					Vector2 start{ static_cast<float>(Globals.screenWidth) * 0.5f, static_cast<float>(Globals.screenHeight) * 0.5f };
-					ImColor traceColor = ImColor(Globals.ColorLines);
-					DrawTraceline(start, Vector2(player.bottomW2S.x, player.bottomW2S.y), traceColor, Globals.LineThickness);
-				}
+				Vector2 start{ static_cast<float>(Globals.screenWidth) * 0.5f, static_cast<float>(Globals.screenHeight) };
+				ImColor traceColor = ImColor(Globals.ColorLines);
+				DrawTraceline(start, player.bottomW2S, traceColor, Globals.LineThickness);
+			}
 
 			if (Globals.maxDistance)
-				DrawDistanceText(Vector2(player.bottomW2S.x, player.bottomW2S.y - 12),
+				DrawDistanceText(Vector2(player.bottomW2S.x, player.bottomW2S.y),
 					player.distance, Globals.ColorDistance);
 		}
 
-
+		//drawsidebar is in menu.cpp so lets forward declare it
+		 
 	DrawSidebar();
 	for (const ItemRenderer& item : Globals.renderItems) {
 		if (Globals.itemsEnabled)
@@ -641,40 +458,9 @@ bool LoadTextureFromResource(int resourceId, ID3D11ShaderResourceView** out_srv,
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 
-inline BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData) {
-	MONITORINFOEX monitorInfo = {};
-	monitorInfo.cbSize = sizeof(MONITORINFOEX);
 
-	if (GetMonitorInfo(hMonitor, &monitorInfo)) {
-		if (Globals.monitor_enum_state != Globals.target_monitor) {
-			Globals.monitor_enum_state++;
-			return TRUE;
-		}
-
-		HWND hwnd = reinterpret_cast<HWND>(dwData);
-
-
-		SetWindowPos(hwnd, NULL, monitorInfo.rcMonitor.left,
-			monitorInfo.rcMonitor.top,
-			monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
-			monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top,
-			SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE);
-
-
-		SetOverlayProperties(Globals.overlayHWND, Globals.OpenMenuKey, Globals.overlayMode);
-
-		return FALSE;
-	}
-	return TRUE;
-}
-  void  set_monitor(int index, HWND hwnd) {
-	Globals.target_monitor = index;
-	Globals.monitor_enum_state = 0;
-	EnumDisplayMonitors(NULL, NULL, MonitorEnumProc,
-		reinterpret_cast<LPARAM>(hwnd));
-}
-
- void SetOverlayProperties(HWND hwnd, bool showMenu, int overlayMode)
+//no overload
+void SetOverlayMode2(HWND hwnd, bool showMenu, int overlayMode)
 {
 	LONG style = GetWindowLong(hwnd, GWL_EXSTYLE);
 
@@ -733,41 +519,95 @@ inline BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT l
 
 	SetWindowLong(hwnd, GWL_EXSTYLE, style);
 }
+void SetOverlayMode(HWND hwnd, bool isTransparent, bool menuVisible) {
+	auto style = GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW;
 
-   void set_mouse_passthrough(HWND hwnd) {
-	 SetOverlayProperties(hwnd, Globals.sidebarOpen, Globals.overlayMode);
- }
+	if (isTransparent) {
+		// Transparent Mode - DWM boost + original behavior
+		MARGINS margins = { -1, -1, -1, -1 };
+		DwmExtendFrameIntoClientArea(hwnd, &margins);
 
- inline void EnableGlassTransparency(HWND hwnd, bool enable) {
-	 Globals.overlayMode = enable ? 0 : 1;
-	 SetOverlayProperties(hwnd, Globals.sidebarOpen, Globals.overlayMode);
- }
+		style |= WS_EX_TOPMOST | WS_EX_LAYERED;
+		style = menuVisible ? style & ~WS_EX_TRANSPARENT : style | WS_EX_TRANSPARENT;
+		SetWindowLong(hwnd, GWL_EXSTYLE, style);
+		SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 255, LWA_COLORKEY | LWA_ALPHA);
+	}
+	else {
+		// Fuser Mode - no DWM, different z-order behavior
+		MARGINS margins = { 0, 0, 0, 0 };
+		DwmExtendFrameIntoClientArea(hwnd, &margins);
+
+		if (menuVisible) {
+			style &= ~(WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE);
+			SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+		}
+		else {
+			style &= ~WS_EX_LAYERED;
+			style |= WS_EX_TRANSPARENT | WS_EX_NOACTIVATE;
+			SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+		}
+		SetWindowLong(hwnd, GWL_EXSTYLE, style);
+	}
+}
+
+
+
+
+void SwitchToMonitor(HWND hwnd, int monitorIndex) {
+	DISPLAY_DEVICE dd = { sizeof(dd) };
+	if (EnumDisplayDevices(NULL, monitorIndex, &dd, 0)) {
+		DEVMODE dm = { sizeof(dm) };
+		if (EnumDisplaySettings(dd.DeviceName, ENUM_CURRENT_SETTINGS, &dm)) {
+			SetWindowPos(hwnd, HWND_TOPMOST,
+				dm.dmPosition.x, dm.dmPosition.y,
+				dm.dmPelsWidth, dm.dmPelsHeight,
+				SWP_NOACTIVATE);
+		}
+	}
+}
+
+
+void DrawSimpleSettings() {
+	// Monitor selection
+	static int currentMonitor = 0;
+	int monitorCount = GetSystemMetrics(SM_CMONITORS);
+	if (ImGui::Combo("Monitor", &currentMonitor,
+		[](void*, int idx, const char** out) {
+			static char buf[32];
+			sprintf(buf, "Monitor %d", idx + 1);
+			*out = buf;
+			return true;
+		}, nullptr, monitorCount)) {
+		SwitchToMonitor(Globals.overlayHWND, currentMonitor);
+	}
+
+	// Overlay mode selection
+	static int overlayMode = 0; // 0 = transparent, 1 = black
+	const char* modes[] = { "Transparent ESP", "Black Fuser" };
+	if (ImGui::Combo("Mode", &overlayMode, modes, 2)) {
+		Globals.overlayMode = overlayMode;
+		SetOverlayMode(Globals.overlayHWND, overlayMode == 0, Globals.sidebarOpen);
+	}
+}
+
 
 void Render::Init() {
-	// Create application window
-	//ImGui_ImplWin32_EnableDpiAwareness();
-	WNDCLASSEXW wc = { sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"Overlay", nullptr };
-	::RegisterClassExW(&wc);
+	WNDCLASSEXW wc = { sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L,
+		GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"Overlay", nullptr };
+	RegisterClassExW(&wc);
 
 	Globals.screenWidth = GetSystemMetrics(SM_CXSCREEN);
 	Globals.screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
-	HWND hwnd = CreateWindowExW(
-		WS_EX_TOOLWINDOW,
-		wc.lpszClassName,
-		L"Makimura",
-		WS_POPUP,
-		0, 0,
-		Globals.screenWidth,
-		Globals.screenHeight,
+	HWND hwnd = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
+		wc.lpszClassName, L"Overlay", WS_POPUP,
+		0, 0, Globals.screenWidth, Globals.screenHeight,
 		nullptr, nullptr, wc.hInstance, nullptr);
-
 
 	Globals.overlayHWND = hwnd;
 
-	EnableGlassTransparency(Globals.overlayHWND, true);
-
-	set_monitor(0, Globals.overlayHWND);
+	 
+	SetOverlayMode2(hwnd, true, true);
 
 	 
 	if (!CreateDeviceD3D(hwnd))
@@ -787,7 +627,7 @@ void Render::Init() {
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-
+	 
 	 
 	Globals.logoFont = LoadFontFromResource(IDR_FONT1, 32.0f, io); 
 	Globals.headerFont = LoadFontFromResource(IDR_FONT2, 22.0f, io); 
@@ -863,6 +703,7 @@ void Render::Init() {
 			CreateRenderTarget();
 		}
 
+		 
 		// Start the Dear ImGui frame
 		ImGui_ImplDX11_NewFrame();
 		ImGui_ImplWin32_NewFrame();
@@ -873,7 +714,15 @@ void Render::Init() {
 		// Rendering
 		ImGui::Render();
 
-		const ImVec4 clear_color = ImVec4(0.f, 0.f, 0.f, 1.00f);
+		ImVec4 clear_color;
+		if (Globals.overlayMode == 0) {
+			// Transparent mode - clear with transparent
+			clear_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+		}
+		else {
+			// Fuser mode - clear with black
+			clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
+		}
 		 
 		const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
 		g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
@@ -886,6 +735,8 @@ void Render::Init() {
 		g_SwapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
 	}
 
+	
+
 	// Cleanup
 	ImGui_ImplDX11_Shutdown();
 	ImGui_ImplWin32_Shutdown();
@@ -897,9 +748,6 @@ void Render::Init() {
 
 	return;
 }
-
-
- 
 
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);

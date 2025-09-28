@@ -192,6 +192,7 @@
     <ClCompile Include="Kmbox\KmboxNet.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Cache\Game.cpp" />
+    <ClCompile Include="Overlay\Menu.cpp" />
     <ClCompile Include="Overlay\Render.cpp" />
     <ClCompile Include="Utils\Utils.h" />
   </ItemGroup>
@@ -199,6 +200,7 @@
     <ClInclude Include="Aimbot\Aimbot.h" />
     <ClInclude Include="Cache\Game.h" />
     <ClInclude Include="Cache\ItemESP.h" />
+    <ClInclude Include="Overlay\Menu.h" />
     <ClInclude Include="Utils\Globals.h" />
     <ClInclude Include="Kmbox\HidTable.h" />
     <ClInclude Include="ImGUI\D3DX11.h" />

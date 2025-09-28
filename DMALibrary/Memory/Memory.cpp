@@ -329,7 +329,7 @@ size_t Memory::GetBaseDaddy(std::string module_name)
 		return 0;
 	}
 
-	LOG("[+] Found Base Address for %s at 0x%p\n", module_name.c_str(), module_info->vaBase);
+	//LOG("[+] Found Base Address for %s at 0x%p\n", module_name.c_str(), module_info->vaBase);
 	baseAddress = module_info->vaBase;
 	return module_info->vaBase;
 }

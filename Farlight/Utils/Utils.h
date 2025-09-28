@@ -352,6 +352,9 @@ inline Vector2 doMatrix(FTransform Bone, FTransform C2W, Camera camera, int scre
 	return Vector2(screenX, screenY);
 }
 
+
+
+
  
 
 

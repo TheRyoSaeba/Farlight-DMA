@@ -63,6 +63,8 @@ struct  PlayerRender {
 	std::string Name;
 };
 
+ 
+
 struct _GameCache {
 	std::atomic<uintptr_t> UWorld{ 0 };
 	std::atomic<uintptr_t> GameInstance{ 0 };
@@ -71,15 +73,15 @@ struct _GameCache {
 	std::atomic<uintptr_t> PersistentLevel{ 0 };
 	std::atomic<uintptr_t> LocalPawn{ 0 };
 	std::atomic<uintptr_t> CameraManager{ 0 };
-    uintptr_t Array_Address = 0;  
-    Camera LocalCamera{};      
-    std::vector<uintptr_t> Actors;
-    std::vector<ItemEntry> Items;
+	uintptr_t Array_Address = 0;
+	Camera LocalCamera{};
+	std::vector<uintptr_t> Actors;
+	std::vector<ItemEntry> Items;
 	std::vector<uintptr_t> lastActorList;
 	std::unordered_set<uintptr_t> cachedPlayerActors;
 	std::unordered_map<uintptr_t, ItemEntry> cachedItemActors;
-    std::mutex cacheMutex;
-    std::chrono::steady_clock::time_point LastCoreUpdate{};
-    std::chrono::steady_clock::time_point LastPlayerUpdate{};
+	std::mutex cacheMutex;
+	std::chrono::steady_clock::time_point LastCoreUpdate{};
+	std::chrono::steady_clock::time_point LastPlayerUpdate{};
 };
 extern _GameCache cache;
