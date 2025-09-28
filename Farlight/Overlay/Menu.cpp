@@ -246,20 +246,33 @@ static void DrawNamedColorPicker(const char* name, ImVec4& color)
 }
 
  void DrawItemCategoryFilter() {
-    static const std::unordered_map<EItemCategory, const char*> categoryNames = {
-        {EItemCategory::SHIELDS, "Shields"}, {EItemCategory::ARMORS, "Armors"},
-        {EItemCategory::AMMO, "Ammo"}, {EItemCategory::ENERGY, "Energy"},
-        {EItemCategory::BACKPACKS, "Backpacks"}, {EItemCategory::WEAPONS, "Weapons"},
-        {EItemCategory::ENHANCERS, "Enhancers"}, {EItemCategory::MISC, "Miscellaneous"}
-    };
-
-    std::vector<EItemCategory> categories = {
-        EItemCategory::SHIELDS, EItemCategory::ARMORS, EItemCategory::AMMO,
-        EItemCategory::ENERGY, EItemCategory::BACKPACKS, EItemCategory::WEAPONS,
-        EItemCategory::ENHANCERS, EItemCategory::MISC
-    };
-
-
+	
+     static const std::unordered_map<EItemCategory, const char*> categoryNames = {
+        {EItemCategory::SHIELDS, "Shields"},
+        {EItemCategory::ARMORS, "Armors"},
+        {EItemCategory::AMMO, "Ammo"},
+        {EItemCategory::ENERGY, "Energy"},
+        {EItemCategory::BACKPACKS, "Backpacks"},
+        {EItemCategory::WEAPONS, "Weapons"},
+        {EItemCategory::ENHANCERS, "Enhancers"},
+        {EItemCategory::REVIVE, "Revive"},
+        {EItemCategory::LOOTBOXES, "Lootboxes"},
+        {EItemCategory::QUEST, "Quest Items"},
+        {EItemCategory::MISC, "Miscellaneous"}
+	 };
+     std::vector<EItemCategory> categories = {
+        EItemCategory::SHIELDS,
+        EItemCategory::ARMORS,
+        EItemCategory::AMMO,
+        EItemCategory::ENERGY,
+        EItemCategory::BACKPACKS,
+        EItemCategory::WEAPONS,
+        EItemCategory::ENHANCERS,
+        EItemCategory::REVIVE,
+        EItemCategory::LOOTBOXES,
+        EItemCategory::QUEST,
+        EItemCategory::MISC
+	 };
     std::string preview = "Select Types";
     if (!Globals.enabledItemCategories.empty()) {
         preview.clear();
@@ -299,22 +312,24 @@ static void DrawNamedColorPicker(const char* name, ImVec4& color)
 
  void DrawWeaponItemFilter()
 {
-    static const std::unordered_map<EWeaponType, const char*> weaponNames = {
-        {EWeaponType::AssualtRifle, "Assault Rifle"}, {EWeaponType::Submachinegun, "Submachinegun"},
-        {EWeaponType::Shotgun, "Shotgun"}, {EWeaponType::Sniper, "Sniper"},
-        {EWeaponType::VehicleMounted, "Vehicle Mounted"}, {EWeaponType::ItemWeapon, "Item Weapon"},
-        {EWeaponType::SummonWeapon, "Summon Weapon"}, {EWeaponType::AntiVehicle, "Anti-Vehicle"},
-        {EWeaponType::ShooterRifle, "Shooter Rifle"}, {EWeaponType::HandGun, "Handgun"},
-        {EWeaponType::LightMachineGun, "Light Machine Gun"}, {EWeaponType::Unarm, "Unarm"},
-        {EWeaponType::Unknown, "Unknown"}
-    };
+     static const std::unordered_map<EWeaponType, const char*> weaponNames = {
+     {EWeaponType::AssualtRifle, "Assault Rifle"},
+     {EWeaponType::Submachinegun, "Submachine Gun"},
+     {EWeaponType::Shotgun, "Shotgun"},
+     {EWeaponType::Sniper, "Sniper Rifle"},
+     {EWeaponType::ShooterRifle, "DMR"},
+     {EWeaponType::HandGun, "Handgun"},
+     {EWeaponType::LightMachineGun, "Light Machine Gun"}
+     };
 
     std::vector<EWeaponType> weapons = {
-        EWeaponType::AssualtRifle, EWeaponType::Submachinegun, EWeaponType::Shotgun,
-        EWeaponType::Sniper, EWeaponType::VehicleMounted, EWeaponType::ItemWeapon,
-        EWeaponType::SummonWeapon, EWeaponType::AntiVehicle, EWeaponType::ShooterRifle,
-        EWeaponType::HandGun, EWeaponType::LightMachineGun, EWeaponType::Unarm,
-        EWeaponType::Unknown
+    EWeaponType::AssualtRifle,
+    EWeaponType::Submachinegun,
+    EWeaponType::Shotgun,
+    EWeaponType::Sniper,
+    EWeaponType::ShooterRifle,
+    EWeaponType::HandGun,
+    EWeaponType::LightMachineGun
     };
 
     const int columns = 4;

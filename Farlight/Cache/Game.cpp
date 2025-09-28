@@ -76,6 +76,7 @@ void Game::Loop() {
     std::thread(Game::UpdateActorsLoop).detach();
 
     ItemESP::Start(true);
+     
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     auto processFrame = [&]() -> bool {
@@ -83,6 +84,9 @@ void Game::Loop() {
         UpdateAttributes(false);
         if (!util::IsValidVA(cache.LocalPawn.load()) || !util::IsValidVA(cache.PersistentLevel.load()))
             return false;
+
+
+        ItemESP::Render(cache.LocalCamera, Globals.screenWidth, Globals.screenHeight);
 
         std::vector<uintptr_t> actorsCopy;
         std::vector<PlayerRender> playerSnapshot;
@@ -175,6 +179,8 @@ void Game::Loop() {
 
         return true; };
 
+   
+
     // Main loop
     static double avgMs = 16.0;
     while (true) {
@@ -253,7 +259,7 @@ void Game::UpdateCore(bool debug) {
 void Game::UpdateActorsLoop() {
     while (true) {
         UpdateActors(false); // Reduced debug spam
-        std::this_thread::sleep_for(std::chrono::milliseconds(2500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(3000));
     }
 }
 
@@ -333,11 +339,21 @@ void Game::UpdateActors(bool debug) {
     {
         std::unique_lock lock(cache.cacheMutex);
         cache.Actors.assign(cache.cachedPlayerActors.begin(), cache.cachedPlayerActors.end());
-        cache.Items.clear();
-        cache.Items.reserve(cache.cachedItemActors.size());
+
+        cache.Items.erase(
+            std::remove_if(cache.Items.begin(), cache.Items.end(),
+                [&removed](const ItemEntry& item) {
+                    return std::find(removed.begin(), removed.end(), item.actor) != removed.end();
+                }),
+            cache.Items.end());
+
         for (const auto& [actor, item] : cache.cachedItemActors) {
-            cache.Items.push_back(item);
+            if (std::find_if(cache.Items.begin(), cache.Items.end(),
+                [actor](const ItemEntry& existing) { return existing.actor == actor; }) == cache.Items.end()) {
+                cache.Items.push_back(item);
+            }
         }
+
         cache.lastActorList = std::move(currentActors);
     }
 
@@ -360,7 +376,7 @@ void Game::UpdateLocal(bool debug) {
 void Game::UpdateAttributes(bool debug) {
     static auto lastUpdate = std::chrono::steady_clock::now();
     auto now = std::chrono::steady_clock::now();
-    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUpdate).count() < 1000) return;
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUpdate).count() < 6000) return;
     lastUpdate = now;
 
      

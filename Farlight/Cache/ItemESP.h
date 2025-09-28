@@ -133,39 +133,74 @@ enum class EItemCategory {
     BACKPACKS,
     WEAPONS,
     ENHANCERS,
+    REVIVE,
+    LOOTBOXES,
+    QUEST,
     MISC,
     MAX
 };
-
 inline EItemCategory GetItemCategory(EItemType itemType) {
     switch (itemType) {
     case EItemType::SHIELD:
     case EItemType::SHIELD_RECHARGER:
     case EItemType::SHIELD_UPGRADE_MATERIAL:
         return EItemCategory::SHIELDS;
+
     case EItemType::ARMOR:
     case EItemType::ARMOR_MATERIAL:
+    case EItemType::HELMET:
         return EItemCategory::ARMORS;
+
     case EItemType::BULLET:
     case EItemType::CARIRIDGE_BAG:
         return EItemCategory::AMMO;
+
     case EItemType::ENERGY_MODULE:
     case EItemType::EXTRA_ENERGY:
     case EItemType::BACKPACK_ENERGY:
     case EItemType::BACKUP_ENERGY:
+    case EItemType::JETPACK_MODULE_HORIZONTAL:
+    case EItemType::JETPACK_MODULE_VERTICAL:
         return EItemCategory::ENERGY;
+
     case EItemType::BACKPACK:
     case EItemType::BACKPACK_ITEM:
         return EItemCategory::BACKPACKS;
+
     case EItemType::WEAPON:
     case EItemType::WEAPON_PARTS:
     case EItemType::WEAPON_SKIN:
         return EItemCategory::WEAPONS;
+
     case EItemType::ENHANCER_AMMO:
     case EItemType::ENHANCER_MEDIC:
     case EItemType::ENHANCER_SHIELD_RECHARGER:
     case EItemType::ENHANCER_BACKPACK:
         return EItemCategory::ENHANCERS;
+
+    case EItemType::REVIVE_ITEM:
+    case EItemType::SELF_RESCUE:
+        return EItemCategory::REVIVE;
+
+    case EItemType::TREASUREBOX:
+    case EItemType::AIRDROPBOX:
+    case EItemType::DEATHBOX:
+    case EItemType::HOTSPRINTBOX:
+    case EItemType::TACTICALBOX:
+    case EItemType::MISSIONCHEST:
+    case EItemType::SUPPLYBOX:
+        return EItemCategory::LOOTBOXES;
+
+    case EItemType::MISSIONSPAWN:
+    case EItemType::MISSIONWORSHIP:
+    case EItemType::NEUTRAL_CARD:
+    case EItemType::COLLECTION_ITEM:
+    case EItemType::DRAGONBALL:
+    case EItemType::TALENT_POINT:
+    case EItemType::COLLECTION_CHEST:
+    case EItemType::KEY_CARD:
+        return EItemCategory::QUEST;
+
     default:
         return EItemCategory::MISC;
     }
@@ -210,20 +245,17 @@ struct ItemRenderer {
 
  
 class ItemESP {
-private:
-    static std::unordered_set<uintptr_t>               oldItemSet;
-    static std::unordered_map<uintptr_t, ItemRenderer> cachedItems;
-    static std::thread                                updateThread;
-    static bool                                       running;
-    static bool debug ;
-    static void UpdateLoop();
-
 public:
-    static void Start(bool debug = false);
+    static void Start(bool dbg = false);
     static void Stop();
-
-    static void Update(const std::vector<ItemEntry>& items,
-        const Camera& cam,
-        int                          screenW,
-        int                          screenH);
+    static void Render(const Camera& cam, int screenW, int screenH); 
+private:
+    static void RefreshLoop();     
+    static void RefreshList();      
+    static std::unordered_set<uintptr_t> oldItemSet;
+    static std::unordered_map<uintptr_t, ItemRenderer> cachedItems;
+    static std::thread refreshThread;
+    static bool running;
+    static bool debug;
+    static constexpr int REFRESH_MS = 1000; 
 };

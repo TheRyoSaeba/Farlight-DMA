@@ -1,4 +1,4 @@
-#include "ItemESP.h"
+﻿#include "ItemESP.h"
 #include <Utils/Globals.h>
 #include <DMALibrary/Memory/Memory.h>
 #include <algorithm>
@@ -6,193 +6,159 @@
 
 std::unordered_set<uintptr_t> ItemESP::oldItemSet;
 std::unordered_map<uintptr_t, ItemRenderer> ItemESP::cachedItems;
-std::thread ItemESP::updateThread;
+std::thread ItemESP::refreshThread;
 bool ItemESP::running = false;
 bool ItemESP::debug = false;
 
-void ItemESP::Start(bool dbg) {
-    if (!running) {
-        debug = dbg;
-        running = true;
-        updateThread = std::thread(UpdateLoop);
-        if (debug) std::cout << "ItemESP thread started\n";
-    }
+
+void ItemESP::Start(bool dbg)
+{
+    if (running) return;
+    debug = dbg;
+    running = true;
+    refreshThread = std::thread(RefreshLoop);
+    if (debug) std::cout << "ItemESP refresh thread started\n";
 }
 
-void ItemESP::Stop() {
+void ItemESP::Stop()
+{
     running = false;
-    if (updateThread.joinable()) {
-        updateThread.join();
-    }
+    if (refreshThread.joinable()) refreshThread.join();
 }
-
-
-void ItemESP::UpdateLoop() {
+void ItemESP::RefreshLoop()
+{
     extern struct _GameCache cache;
-
     while (running) {
-        if (!Globals.itemsEnabled) {
-            std::unique_lock lock(Globals.itemMutex);
-            Globals.renderItems.clear();
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            continue;
-        }
-
-        
-        if (!util::IsValidVA(cache.CameraManager.load()) || !util::IsValidVA(cache.LocalPawn.load())) {
-            std::unique_lock lock(Globals.itemMutex);
-            Globals.renderItems.clear();
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            continue;
-        }
-
-       
-        std::vector<ItemEntry> currentItems;
-        Camera localCam;
-        {
-            std::unique_lock lock(cache.cacheMutex);
-            currentItems = cache.Items;
-            localCam = cache.LocalCamera;
-        }
-
-        Update(currentItems, localCam, Globals.screenWidth, Globals.screenHeight);
-        std::this_thread::sleep_for(std::chrono::milliseconds(50)); // 20fps updates
+        RefreshList();  
+        std::this_thread::sleep_for(std::chrono::milliseconds(REFRESH_MS));
     }
 }
-void ItemESP::Update(const std::vector<ItemEntry>& items, const Camera& cam, int screenW, int screenH) {
-    std::unordered_set<uintptr_t> newItemSet;
-
-    // Use your original filtering logic - don't break what works
-    for (const auto& item : items) {
-        if (!util::IsValidVA(item.actor))
-            continue;
-
-        EItemCategory category = GetItemCategory(item.ItemType);
-        if (Globals.enabledItemCategories.find(category) == Globals.enabledItemCategories.end())
-            continue;
-        if (category == EItemCategory::WEAPONS) {
-            if (Globals.enabledWeaponTypes.find(item.WeaponType) == Globals.enabledWeaponTypes.end())
-                continue;
-        }
-
-        newItemSet.insert(item.actor);
+void ItemESP::RefreshList()
+{
+    extern struct _GameCache cache;
+    if (!Globals.itemsEnabled) {
+        std::unique_lock lk(Globals.itemMutex);
+        Globals.renderItems.clear();
+        cachedItems.clear();
+        oldItemSet.clear();
+        return;
     }
+    if (!util::IsValidVA(cache.CameraManager.load()) ||
+        !util::IsValidVA(cache.LocalPawn.load())) return;
 
-    // Calculate differences
-    std::vector<uintptr_t> removed, added;
-    std::set_difference(oldItemSet.begin(), oldItemSet.end(),
-        newItemSet.begin(), newItemSet.end(),
-        std::back_inserter(removed));
-    std::set_difference(newItemSet.begin(), newItemSet.end(),
-        oldItemSet.begin(), oldItemSet.end(),
-        std::back_inserter(added));
-
-    // Remove deleted actors from cache
-    for (uintptr_t actor : removed) {
-        cachedItems.erase(actor);
-        if (debug) std::cout << "Removed item: 0x" << std::hex << actor << std::dec << "\n";
-    }
-
-    // Process new items
-    if (!added.empty()) {
-        auto scatter = mem.CreateScatterHandle();
-        std::vector<uintptr_t> rootComponents(added.size(), 0);
-
-        for (size_t i = 0; i < added.size(); ++i) {
-            mem.AddScatterReadRequest(scatter, added[i] + 0x1b0, &rootComponents[i], sizeof(uintptr_t));
-        }
-        mem.ExecuteReadScatter(scatter);
-
-        std::vector<FTransform> compToWorlds(added.size());
-        for (size_t i = 0; i < added.size(); ++i) {
-            if (util::IsValidVA(rootComponents[i])) {
-                mem.AddScatterReadRequest(scatter, rootComponents[i] + Globals.offsets.componentToWorld,
-                    &compToWorlds[i], sizeof(FTransform));
-            }
-        }
-        mem.ExecuteReadScatter(scatter);
-        mem.CloseScatterHandle(scatter);
-
-        for (size_t i = 0; i < added.size(); ++i) {
-            uintptr_t actor = added[i];
-
-            const ItemEntry* itemEntry = nullptr;
-            for (const auto& item : items) {
-                if (item.actor == actor) {
-                    itemEntry = &item;
-                    break;
-                }
-            }
-            if (!itemEntry) continue;
-
-            ItemRenderer ir{};
-            ir.Actor = actor;
-            ir.Item = itemEntry->ItemType;
-            ir.Weapon = itemEntry->WeaponType;
-            ir.Location = compToWorlds[i].translation;
-            float dx = ir.Location.x - cam.Location.x;
-            float dy = ir.Location.y - cam.Location.y;
-            float dz = ir.Location.z - cam.Location.z;
-            float distance = sqrtf(dx * dx + dy * dy + dz * dz) / 100.0f - 3.0f;
-            ir.distance = distance;
-
-            FSolarItemData itemData = mem.Read<FSolarItemData>(actor + 0x360);
-            auto readFString = [&](const FString& f) -> std::string {
-                if (!f.IsValid() || f.Count <= 0 || f.Count > 128 || !util::IsValidVA((uintptr_t)f.Data))
-                    return {};
-                std::vector<wchar_t> buf(f.Count + 1);
-                if (!mem.Read((uintptr_t)f.Data, buf.data(), f.Count * sizeof(wchar_t)))
-                    return {};
-                buf[buf.size() - 1] = L'\0';
-                return std::string(buf.begin(), buf.end() - 1);
-                };
-            ir.Name = readFString(itemData.Name);
-
-            cachedItems[actor] = std::move(ir);
-        }
-
-        if (debug) {
-            std::cout << "Items processed - Added: " << added.size() << ", Total cached: " << cachedItems.size() << "\n";
-        }
-    }
-
-    oldItemSet = std::move(newItemSet);
-
-    // Process cached items for rendering - ONLY CHANGE: Single atomic update
-    std::vector<ItemRenderer> renderItems;
-    renderItems.reserve(cachedItems.size());
-
-    for (auto& [actor, item] : cachedItems) {
-        FTransform dummyBone{};
-        dummyBone.translation = Vector3(0, 0, 0);
-        dummyBone.rot = { 0.0f, 0.0f, 0.0f, 1.0f };
-        dummyBone.scale = { 1.0f, 1.0f, 1.0f };
-
-        FTransform worldTransform{};
-        worldTransform.translation = item.Location;
-        worldTransform.rot = { 0.0f, 0.0f, 0.0f, 1.0f };
-        worldTransform.scale = { 1.0f, 1.0f, 1.0f };
-
-        Vector2 screenPos = doMatrix(dummyBone, worldTransform, cam, screenW, screenH);
-
-        if (screenPos.x >= 0.0f && screenPos.x <= static_cast<float>(screenW) &&
-            screenPos.y >= 0.0f && screenPos.y <= static_cast<float>(screenH)) {
-
-            float dx = item.Location.x - cam.Location.x;
-            float dy = item.Location.y - cam.Location.y;
-            float dz = item.Location.z - cam.Location.z;
-            float distance = sqrtf(dx * dx + dy * dy + dz * dz) / 100.0f - 3.0f;
-
-            ItemRenderer renderItem = item;
-            renderItem.W2S = screenPos;
-            renderItem.distance = distance;
-            renderItems.push_back(std::move(renderItem));
-        }
-    }
-
-    // MAIN FIX: Single atomic update instead of modifying during iteration
+    std::vector<ItemEntry> curItems;
     {
-        std::unique_lock lock(Globals.itemMutex);
+        std::unique_lock lk(cache.cacheMutex);
+        curItems = cache.Items;
+    }
+
+    std::unordered_set<uintptr_t> newSet;
+    for (const auto& i : curItems) {
+        if (!util::IsValidVA(i.actor)) continue;
+        EItemCategory cat = GetItemCategory(i.ItemType);
+        if (Globals.enabledItemCategories.find(cat) == Globals.enabledItemCategories.end()) continue;
+        if (cat == EItemCategory::WEAPONS &&
+            Globals.enabledWeaponTypes.find(i.WeaponType) == Globals.enabledWeaponTypes.end())
+            continue;
+        newSet.insert(i.actor);
+    }
+
+    for (uintptr_t a : oldItemSet) {
+        if (newSet.find(a) == newSet.end()) cachedItems.erase(a);
+    }
+    for (uintptr_t a : newSet) {
+        if (oldItemSet.find(a) != oldItemSet.end()) continue; 
+        const ItemEntry* src = nullptr;
+        for (const auto& it : curItems) if (it.actor == a) { src = &it; break; }
+        if (!src) continue;
+        ItemRenderer ir{};
+        ir.Actor = a;
+        ir.Item = src->ItemType;
+        ir.Weapon = src->WeaponType;
+        FSolarItemData itemData = mem.Read<FSolarItemData>(a + 0x360);
+        auto readFString = [&](const FString& f) -> std::string {
+            if (!f.IsValid() || f.Count <= 0 || f.Count > 128 || !util::IsValidVA((uintptr_t)f.Data))
+                return {};
+            std::vector<wchar_t> buf(f.Count + 1);
+            if (!mem.Read((uintptr_t)f.Data, buf.data(), f.Count * sizeof(wchar_t)))
+                return {};
+            buf[buf.size() - 1] = L'\0';
+            return std::string(buf.begin(), buf.end() - 1);
+            };
+        ir.Name = readFString(itemData.Name);
+        cachedItems.emplace(a, std::move(ir));
+    }
+    oldItemSet = std::move(newSet);
+}
+
+
+void ItemESP::Render(const Camera& cam, int screenW, int screenH)
+{
+    extern struct _GameCache cache;
+    if (!Globals.itemsEnabled) return;
+    if (!util::IsValidVA(cache.CameraManager.load()) ||
+        !util::IsValidVA(cache.LocalPawn.load())) return;
+
+    // copy the current list of cached items (static data only)
+    std::vector<ItemRenderer> toRender;
+    {
+        std::unique_lock lk(Globals.itemMutex);
+        toRender.reserve(cachedItems.size());
+        for (auto& [actor, data] : cachedItems) toRender.push_back(data);
+    }
+    if (toRender.empty()) return;
+
+    // ----- scatter read root‑component & world transform for *all* items -----
+    auto scatter = mem.CreateScatterHandle();
+    std::vector<uintptr_t> rootComp(toRender.size(), 0);
+    for (size_t i = 0; i < toRender.size(); ++i)
+        mem.AddScatterReadRequest(scatter, toRender[i].Actor + 0x1b0, &rootComp[i], sizeof(uintptr_t));
+    mem.ExecuteReadScatter(scatter);
+
+    std::vector<FTransform> world(toRender.size());
+    for (size_t i = 0; i < toRender.size(); ++i) {
+        if (util::IsValidVA(rootComp[i]))
+            mem.AddScatterReadRequest(scatter,
+                rootComp[i] + Globals.offsets.componentToWorld,
+                &world[i], sizeof(FTransform));
+    }
+    mem.ExecuteReadScatter(scatter);
+    mem.CloseScatterHandle(scatter);
+
+    // ----- build final render list (screen‑space, distance) -----
+    std::vector<ItemRenderer> renderItems;
+    renderItems.reserve(toRender.size());
+
+    for (size_t i = 0; i < toRender.size(); ++i) {
+        if (!util::IsValidVA(rootComp[i])) continue;
+        const auto& it = toRender[i];
+        ItemRenderer r = it;
+        r.Location = world[i].translation;
+
+        // world → screen
+        FTransform dummy{};
+        dummy.translation = Vector3(0, 0, 0);
+        dummy.rot = { 0,0,0,1 };
+        dummy.scale = { 1,1,1 };
+        
+
+        r.W2S = doMatrix(dummy, world[i], cam, screenW, screenH);
+
+        // distance (same formula used for players)
+        float dx = r.Location.x - cam.Location.x;
+        float dy = r.Location.y - cam.Location.y;
+        float dz = r.Location.z - cam.Location.z;
+        r.distance = std::sqrt(dx * dx + dy * dy + dz * dz) / 100.0f - 3.0f;
+
+        renderItems.push_back(std::move(r));
+    }
+
+    // ----- atomic update of the global rendering vector -----
+    {
+        std::unique_lock lk(Globals.itemMutex);
         Globals.renderItems = std::move(renderItems);
     }
+    if (debug)
+        std::cout << "ItemESP rendered " << Globals.renderItems.size()
+        << " items this frame\n";
 }

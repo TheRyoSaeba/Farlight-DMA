@@ -209,15 +209,21 @@ void Render::Loop() {
 	for (const ItemRenderer& item : Globals.renderItems) {
 		if (Globals.itemsEnabled)
 		{
-			if (item.distance > Globals.MaxItemDistance)
+			
+			if (item.distance > Globals.MaxItemDistance || item.distance < 0.0f)
 				continue;
-			if (Globals.DrawItemName)
-				DrawItemName(item.W2S, item.Name, Globals.ColorItems);
+			if (item.Name.empty() || item.Name == "?" || item.Name == "Unknown")
+				continue;
+			// lets use a variable to decide between Globals.coloritems or globals.colorweapons
+
+			ImVec4 color = (item.Item == EItemType::WEAPON) ? Globals.ColorWeapons : Globals.ColorItems;
+			  
+				DrawItemName(item.W2S, item.Name, color);
 
 			if (Globals.DrawItemBox)
-				DrawItemBox(item.W2S, 50.0f, 20.0f, Globals.ColorItems);
+				DrawItemBox(item.W2S, 50.0f, 20.0f, color);
 
-			DrawItemDistanceText(item.W2S, item.distance, ImColor(255, 255, 255));
+			DrawItemDistanceText(item.W2S, item.distance, color);
 
 		}
 			 
