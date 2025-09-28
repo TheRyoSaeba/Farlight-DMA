@@ -586,7 +586,7 @@ void DrawSimpleSettings() {
 	const char* modes[] = { "Transparent ESP", "Black Fuser" };
 	if (ImGui::Combo("Mode", &overlayMode, modes, 2)) {
 		Globals.overlayMode = overlayMode;
-		SetOverlayMode(Globals.overlayHWND, overlayMode == 0, Globals.sidebarOpen);
+		SetOverlayMode2(Globals.overlayHWND, overlayMode == 0, Globals.sidebarOpen);
 	}
 }
 
