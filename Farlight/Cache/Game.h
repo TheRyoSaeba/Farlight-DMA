@@ -76,10 +76,9 @@ struct _GameCache {
 	uintptr_t Array_Address = 0;
 	Camera LocalCamera{};
 	std::vector<uintptr_t> Actors;
-	std::vector<ItemEntry> Items;
 	std::vector<uintptr_t> lastActorList;
 	std::unordered_set<uintptr_t> cachedPlayerActors;
-	std::unordered_map<uintptr_t, ItemEntry> cachedItemActors;
+	std::unordered_set<uintptr_t> cachedItemActors;
 	std::mutex cacheMutex;
 	std::chrono::steady_clock::time_point LastCoreUpdate{};
 	std::chrono::steady_clock::time_point LastPlayerUpdate{};

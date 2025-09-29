@@ -219,18 +219,7 @@ struct FSolarItemData {
 };
 #pragma pack(pop)
 
-struct ItemEntry {
-    uintptr_t actor = 0;
-    int32_t   ItemID = 0;
-    int64_t   ThisID = 0;
-    EItemType ItemType = EItemType::NONE;
-    int32_t   Count = 0;
-    std::string Name;
-    std::string Icon;
-    std::string Info;
-    EWeaponType WeaponType = EWeaponType::Unknown;
-    int32_t   weaponid = 0;
-};
+
 
 struct ItemRenderer {
     uintptr_t Actor = 0;

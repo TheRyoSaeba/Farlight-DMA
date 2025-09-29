@@ -37,7 +37,6 @@ init:
 	std::cout << "DMA initialized" << std::endl;
 
 
-	//auto base = mem.GetBaseDaddy(Globals.processName);
 
 
 	if (!mem.GetKeyboard()->InitKeyboard())
@@ -57,13 +56,14 @@ init:
 	}
 	
 
-	/*if (!Get_Uworld())
+
+	if (!Get_Uworld())
 	{
 		std::cout << "Failed to get UWorld" << std::endl;
 		system("pause");
 		return 1;
 
-	}*/ 
+	}
 
 	mem.FullRefresh();
 

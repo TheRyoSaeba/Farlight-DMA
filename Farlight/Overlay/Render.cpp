@@ -154,13 +154,16 @@ void Render::Loop() {
 		for (const PlayerRender& player : Globals.renderPlayers) {
 			if (player.AliveDeadorKnocked == ECharacterHealthState::ECHS_Dead)
 				continue;
+
+
+			if (player.distance > Globals.maxDistance || player.distance < 0.0f)continue;
 			 
 
 			float boxHeight = fabs(player.headW2S.y - player.bottomW2S.y);
 			float boxWidth = boxHeight * 0.5f;
 
                 
-
+			  
 			if (Globals.ESPEnabled) {
 				DrawBox(Vector2(player.bottomW2S.x, (player.headW2S.y + player.bottomW2S.y) / 2),
 					boxWidth, boxHeight,
@@ -182,7 +185,7 @@ void Render::Loop() {
 					float boxCenterY = (player.headW2S.y + player.bottomW2S.y) / 2.0f;
 					float boxLeft = player.bottomW2S.x - (boxWidth / 2.0f);
 					const float barWidth = 6.0f;
-					const float gap = 6.0f; // gap between box and bar
+					const float gap = 6.0f; 
 					Vector2 barCenter;
 					barCenter.x = boxLeft - gap - (barWidth / 2.0f);
 					barCenter.y = boxCenterY;
@@ -203,7 +206,7 @@ void Render::Loop() {
 					player.distance, Globals.ColorDistance);
 		}
 
-		//drawsidebar is in menu.cpp so lets forward declare it
+		
 		 
 	DrawSidebar();
 	for (const ItemRenderer& item : Globals.renderItems) {
@@ -214,7 +217,7 @@ void Render::Loop() {
 				continue;
 			if (item.Name.empty() || item.Name == "?" || item.Name == "Unknown")
 				continue;
-			// lets use a variable to decide between Globals.coloritems or globals.colorweapons
+			
 
 			ImVec4 color = (item.Item == EItemType::WEAPON) ? Globals.ColorWeapons : Globals.ColorItems;
 			  
@@ -525,21 +528,21 @@ void SetOverlayMode2(HWND hwnd, bool showMenu, int overlayMode)
 
 	SetWindowLong(hwnd, GWL_EXSTYLE, style);
 }
-void SetOverlayMode(HWND hwnd, bool isTransparent, bool menuVisible) {
-	auto style = GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW;
+void SetOverlayMode(HWND hwnd, bool isTransparent, bool menuVisible)
+{
+	LONG style = GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW;
 
 	if (isTransparent) {
-		// Transparent Mode - DWM boost + original behavior
 		MARGINS margins = { -1, -1, -1, -1 };
 		DwmExtendFrameIntoClientArea(hwnd, &margins);
 
 		style |= WS_EX_TOPMOST | WS_EX_LAYERED;
 		style = menuVisible ? style & ~WS_EX_TRANSPARENT : style | WS_EX_TRANSPARENT;
+
 		SetWindowLong(hwnd, GWL_EXSTYLE, style);
 		SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 255, LWA_COLORKEY | LWA_ALPHA);
 	}
 	else {
-		// Fuser Mode - no DWM, different z-order behavior
 		MARGINS margins = { 0, 0, 0, 0 };
 		DwmExtendFrameIntoClientArea(hwnd, &margins);
 
@@ -550,8 +553,10 @@ void SetOverlayMode(HWND hwnd, bool isTransparent, bool menuVisible) {
 		else {
 			style &= ~WS_EX_LAYERED;
 			style |= WS_EX_TRANSPARENT | WS_EX_NOACTIVATE;
-			SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+			SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+				SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 		}
+
 		SetWindowLong(hwnd, GWL_EXSTYLE, style);
 	}
 }
@@ -592,7 +597,7 @@ void DrawSimpleSettings() {
 	const char* modes[] = { "Transparent ESP", "Black Fuser" };
 	if (ImGui::Combo("Mode", &overlayMode, modes, 2)) {
 		Globals.overlayMode = overlayMode;
-		SetOverlayMode2(Globals.overlayHWND, overlayMode == 0, Globals.sidebarOpen);
+		SetOverlayMode(Globals.overlayHWND, overlayMode == 0, Globals.sidebarOpen);
 	}
 }
 
@@ -613,7 +618,7 @@ void Render::Init() {
 	Globals.overlayHWND = hwnd;
 
 	 
-	SetOverlayMode2(hwnd, true, true);
+	SetOverlayMode(Globals.overlayHWND, Globals.overlayMode,Globals.sidebarOpen);
 
 	 
 	if (!CreateDeviceD3D(hwnd))

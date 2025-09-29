@@ -95,6 +95,7 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="Cache\ItemESP.h" />
     <ClInclude Include="Overlay\Menu.h" />
+    <ClInclude Include="Cache\bones.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Aimbot">

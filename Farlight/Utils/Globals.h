@@ -17,7 +17,11 @@ inline namespace FarlightDMA {
         int screenWidth = 2560;
         int screenHeight = 1440;
 
-         
+        // Throttle overlay to reduce GPU/CPU usage when overlay is active.
+        // Set to 0 to disable throttling.
+        int overlayFPSLimit = 60;
+
+        
         float maxDistance = 300.0f;
         float MaxItemDistance = 300.0f;
 
@@ -80,7 +84,7 @@ inline namespace FarlightDMA {
         std::mutex itemMutex;
 
         // --- Misc ---
-         int overlayMode = 0;
+         int overlayMode = 1;
           int target_monitor = -1;
          int monitor_enum_state = 0;
         int readFPS = 0;
@@ -98,6 +102,7 @@ inline namespace FarlightDMA {
 		struct Offsets {
 			uintptr_t uworld = 0x9F319B0;
 			uintptr_t persistentlevel = 0x30;
+            uintptr_t AActors = 0x98;
 			uintptr_t gameInstance = 0x1f0;
 			uintptr_t playersArray = 0x38; //localplayers
 			uintptr_t playerController = 0x30;
@@ -116,11 +121,12 @@ inline namespace FarlightDMA {
 			uintptr_t CharacterHealthState = 0x1f21;
             uintptr_t Actor_State = 0x2f8;
 			uintptr_t AbilitySystemComponent = 0x650;
+            uintptr_t FSolarItemData = 0x360; //ASolarItemActor
 			uintptr_t mesh = 0x338;  /*// Inheritance: APawn > AActor > UObjectnamespace ACharacter {*/
 			uintptr_t lastSubmitTime = 0x0;
 			uintptr_t lastRenderTime = 0x0;
 			uintptr_t componentToWorld = 0x270;
-			uintptr_t boneArray = 0x6B0;
+			uintptr_t boneArray = 0x6B0;   //-> UskinnedMeshComponent
 			uintptr_t GNAMES = 0x9DBA1C0;
 			uintptr_t GOBJECTS;
 		} offsets;
@@ -187,7 +193,6 @@ inline void DumpGame() {
             std::cout << "           Memory Dump Utility" << std::endl;
             std::cout << "=============================================" << std::endl;
             std::cout << std::endl;
-
             std::cout << "Enter dump file name (without extension): ";
             std::string dumpName;
             std::getline(std::cin, dumpName);

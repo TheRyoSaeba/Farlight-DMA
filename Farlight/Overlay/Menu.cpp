@@ -385,6 +385,7 @@ static void DrawNamedColorPicker(const char* name, ImVec4& color)
     ImGui::Separator();
     ImGui::Spacing();
     ImGui::PushItemWidth(-1);
+    //also maybe tree node//
 
     auto SectionHeader = [&](const char* label, ImVec4 base, std::function<void()> body) {
         ScopedStyleColor c1(ImGuiCol_Header, base);
