@@ -12,9 +12,9 @@ But i got Banned, Then i had a Delta Force ESP going before ban and encryption s
 - Basic ESP
 - Basic leftover aimbot
 ## Planned :
--  Learn how to properly loop actor list
+-  ~~Learn how to properly loop actor list~~
 -  Learn how to really properly cache
--  Fix item esp
+-  ~~Fix item esp~~
 -  finish menu
 -  so much more 
  
