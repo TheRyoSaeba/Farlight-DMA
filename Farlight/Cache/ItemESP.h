@@ -232,6 +232,7 @@ struct ItemRenderer {
     std::string Name;
 };
 
+
  
 class ItemESP {
 public:
@@ -239,12 +240,11 @@ public:
     static void Stop();
     static void Render(const Camera& cam, int screenW, int screenH); 
 private:
-    static void RefreshLoop();     
-    static void RefreshList();      
-    static std::unordered_set<uintptr_t> oldItemSet;
+    static void RefreshLoop();
+    static void RefreshList();
     static std::unordered_map<uintptr_t, ItemRenderer> cachedItems;
     static std::thread refreshThread;
     static bool running;
     static bool debug;
-    static constexpr int REFRESH_MS = 1000; 
+    static constexpr int REFRESH_MS = 3000; 
 };

@@ -53,7 +53,7 @@
 #include "d3dx11.h"
 #include "d3dx11core.h"
 #include "d3dx11tex.h"
-#include "d3dx11async.h"
+//#include "d3dx11async.h"
 
 // Errors
 #define _FACDD  0x876

@@ -29,7 +29,7 @@ inline namespace FarlightDMA {
         bool ESPEnabled = true;
 		bool DrawHeadCircle = true;
 		bool DrawBones = true;
-		bool DrawHP = false;
+		bool DrawHP = true;
 		bool DrawNames = true;
 		bool DrawTraceline = false;
         bool itemsEnabled = true;
@@ -38,6 +38,7 @@ inline namespace FarlightDMA {
         bool HeadEnabled = true;
         bool DistanceEnabled = true;
         bool refreshcheat = false;
+        bool running = true;
 
      
        //aimbot 
@@ -54,6 +55,8 @@ inline namespace FarlightDMA {
         int OvrlyMode = 0 ;
          HWND overlayHWND = nullptr;
          bool sidebarOpen = true;
+         bool vsync = false;
+         int fps_limit = 240;
         //
         ImVec4 ColorPlayerBox = ImVec4(0.1f, 1.0f, 0.1f, 1.0f); // green
         ImVec4 ColorBones = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // white
@@ -84,7 +87,7 @@ inline namespace FarlightDMA {
         std::mutex itemMutex;
 
         // --- Misc ---
-         int overlayMode = 1;
+         int overlayMode = 0;
           int target_monitor = -1;
          int monitor_enum_state = 0;
         int readFPS = 0;
@@ -110,6 +113,7 @@ inline namespace FarlightDMA {
 			uintptr_t playerCameraCache = 0x2bc0;
 			uintptr_t playerCameraPOV = 0x10;
 			uintptr_t localPawn = 0x370;
+            uintptr_t RootComponent = 0x1b0;
 			uintptr_t gameState = 0x198;
 			uintptr_t playerArray = 0x310;
 			uintptr_t pawnPrivate = 0x340;
@@ -122,6 +126,7 @@ inline namespace FarlightDMA {
             uintptr_t Actor_State = 0x2f8;
 			uintptr_t AbilitySystemComponent = 0x650;
             uintptr_t FSolarItemData = 0x360; //ASolarItemActor
+            uintptr_t WeaponTypes = 0x56c;   
 			uintptr_t mesh = 0x338;  /*// Inheritance: APawn > AActor > UObjectnamespace ACharacter {*/
 			uintptr_t lastSubmitTime = 0x0;
 			uintptr_t lastRenderTime = 0x0;
@@ -133,7 +138,7 @@ inline namespace FarlightDMA {
 
 		struct Settings {
 			float smoothing = 2.25;
-			float fov = 90.0f;
+			float fov = 40.0f;
             bool IgnoreKnocked = true;
             bool TriggerbotEnabled = false;
             int TriggerDelayMS;

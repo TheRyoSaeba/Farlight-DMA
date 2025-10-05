@@ -96,6 +96,7 @@
     <ClInclude Include="Cache\ItemESP.h" />
     <ClInclude Include="Overlay\Menu.h" />
     <ClInclude Include="Cache\bones.h" />
+    <ClInclude Include="ImGUI\d3dx11core.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Aimbot">

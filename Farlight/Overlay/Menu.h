@@ -3,7 +3,7 @@
 #include  "Render.h"
 
 void SetOverlayMode(HWND hwnd, bool isTransparent, bool menuVisible);
-void SetOverlayMode2(HWND hwnd, bool showMenu, int overlayMode);
+void SetOverlayMode2(HWND hwnd, int overlayMode, bool showMenu);
 void SwitchToMonitor(HWND hwnd, int monitorIndex);
 void AddVerticalSpacing(float spacing);
 void HoverTooltip(const char* txt);
@@ -46,3 +46,5 @@ struct StyleColorScope {
     StyleColorScope(const StyleColorScope&) = delete;
     StyleColorScope& operator=(const StyleColorScope&) = delete;
 };
+
+

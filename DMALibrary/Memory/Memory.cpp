@@ -230,10 +230,10 @@ bool Memory::Init(std::string process_name, bool memMap, bool debug)
 		return false;
 	}
 
-	LOG("Process information of %s\n", process_name.c_str());
-	LOG("PID: %i\n", current_process.PID);
-	LOG("Base Address: 0x%llx\n", current_process.base_address);
-	LOG("Base Size: 0x%llx\n", current_process.base_size);
+	//LOG("Process information of %s\n", process_name.c_str());
+	//LOG("PID: %i\n", current_process.PID);
+	//LOG("Base Address: 0x%llx\n", current_process.base_address);
+	//LOG("Base Size: 0x%llx\n", current_process.base_size);
 
 	PROCESS_INITIALIZED = TRUE;
 

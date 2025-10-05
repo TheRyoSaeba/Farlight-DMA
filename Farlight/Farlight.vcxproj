@@ -201,6 +201,7 @@
     <ClInclude Include="Cache\bones.h" />
     <ClInclude Include="Cache\Game.h" />
     <ClInclude Include="Cache\ItemESP.h" />
+    <ClInclude Include="ImGUI\d3dx11core.h" />
     <ClInclude Include="Overlay\Menu.h" />
     <ClInclude Include="Utils\Globals.h" />
     <ClInclude Include="Kmbox\HidTable.h" />

@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <iostream>
 
-std::unordered_set<uintptr_t> ItemESP::oldItemSet;
 std::unordered_map<uintptr_t, ItemRenderer> ItemESP::cachedItems;
 std::thread ItemESP::refreshThread;
 bool ItemESP::running = false;
@@ -13,210 +12,240 @@ bool ItemESP::debug = false;
 
 void ItemESP::Start(bool dbg)
 {
-    if (running) return;
-    debug = dbg;
-    running = true;
-    refreshThread = std::thread(RefreshLoop);
-    if (debug) std::cout << "ItemESP refresh thread started\n";
+	if (running) return;
+	debug = dbg;
+	running = true;
+	refreshThread = std::thread(RefreshLoop);
+	if (debug) std::cout << "ItemESP refresh thread started\n";
 }
 
 void ItemESP::Stop()
 {
-    running = false;
-    if (refreshThread.joinable()) refreshThread.join();
+	running = false;
+	if (refreshThread.joinable()) refreshThread.join();
 }
 
 void ItemESP::RefreshLoop() {
-    static std::unordered_set<EItemCategory> lastCategories;
-    static std::unordered_set<EWeaponType> lastWeaponTypes;
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    while (running) {
-        bool filtersChanged = (lastCategories != Globals.enabledItemCategories) ||
-            (lastWeaponTypes != Globals.enabledWeaponTypes);
-
-        if (filtersChanged) {
-            lastCategories = Globals.enabledItemCategories;
-            lastWeaponTypes = Globals.enabledWeaponTypes;
-            RefreshList();
-        }
-
-        RefreshList(); 
-        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-    }
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	while (running) {
+		RefreshList();
+		std::this_thread::sleep_for(std::chrono::milliseconds(REFRESH_MS));
+	}
 }
+
 void ItemESP::RefreshList() {
-    extern struct _GameCache cache;
-    if (!Globals.itemsEnabled) {
-        std::unique_lock lk(Globals.itemMutex);
-        Globals.renderItems.clear();
-        cachedItems.clear();
-        oldItemSet.clear();
-        return;
-    }
+	extern struct _GameCache cache;
 
-    if (!util::IsValidVA(cache.CameraManager.load()) ||
-        !util::IsValidVA(cache.LocalPawn.load())) {
-        return; 
-    }
+	if (!Globals.itemsEnabled) {
+		std::unique_lock lk(Globals.itemMutex);
+		cachedItems.clear();
+		return;
+	}
 
+	// Get ALL current item actors from game cache
+	std::unordered_set<uintptr_t> currentActors;
+	{
+		std::unique_lock lk(cache.cacheMutex);
+		currentActors = cache.cachedItemActors;
+	}
 
-    std::unordered_set<uintptr_t> currentActors;
-    {
-        std::unique_lock lk(cache.cacheMutex);
-        currentActors = cache.cachedItemActors;
-    }
+	if (currentActors.empty()) {
+		std::unique_lock lk(Globals.itemMutex);
+		cachedItems.clear();
+		return;
+	}
 
-    if (currentActors.empty()) return;
+	std::vector<uintptr_t> actorList(currentActors.begin(), currentActors.end());
 
-    std::vector<uintptr_t> actorList(currentActors.begin(), currentActors.end());
+	// Separate new actors from existing cached actors
+	std::vector<uintptr_t> newActors;
+	std::vector<uintptr_t> existingActors;
+	{
+		std::unique_lock lk(Globals.itemMutex);
+		for (uintptr_t actor : actorList) {
+			if (cachedItems.find(actor) == cachedItems.end()) {
+				newActors.push_back(actor);
+			} else {
+				existingActors.push_back(actor);
+			}
+		}
+	}
 
-    auto scatter = mem.CreateScatterHandle();
-    std::vector<FSolarItemData> itemDataBatch(actorList.size());
-    std::vector<EWeaponType> weaponTypes(actorList.size());
+	std::unordered_map<uintptr_t, ItemRenderer> newCache;
 
-    for (size_t i = 0; i < actorList.size(); ++i) {
-        mem.AddScatterReadRequest(scatter, actorList[i] + 0x360, &itemDataBatch[i], sizeof(FSolarItemData));
-        mem.AddScatterReadRequest(scatter, actorList[i] + 0x56c, &weaponTypes[i], sizeof(EWeaponType));
-    }
-    mem.ExecuteReadScatter(scatter);
-    mem.CloseScatterHandle(scatter);
+	// For existing items: only update transforms (fast path)
+	if (!existingActors.empty()) {
+		auto scatter = mem.CreateScatterHandle();
+		std::vector<uintptr_t> rootComps(existingActors.size());
 
-    std::unordered_set<uintptr_t> newSet;
-    for (size_t i = 0; i < actorList.size(); ++i) {
-        uintptr_t actor = actorList[i];
-        const auto& itemData = itemDataBatch[i];
+		for (size_t i = 0; i < existingActors.size(); ++i) {
+			mem.AddScatterReadRequest(scatter, existingActors[i] + Globals.offsets.RootComponent, &rootComps[i], sizeof(uintptr_t));
+		}
+		mem.ExecuteReadScatter(scatter);
 
-        if (itemData.ItemType == EItemType::NONE) continue;
+		std::vector<FTransform> transforms(existingActors.size());
+		for (size_t i = 0; i < existingActors.size(); ++i) {
+			if (util::IsValidVA(rootComps[i])) {
+				mem.AddScatterReadRequest(scatter, rootComps[i] + Globals.offsets.componentToWorld,
+					&transforms[i], sizeof(FTransform));
+			}
+		}
+		mem.ExecuteReadScatter(scatter);
+		mem.CloseScatterHandle(scatter);
 
-       
-        EItemCategory cat = GetItemCategory(itemData.ItemType);
-        if (Globals.enabledItemCategories.find(cat) == Globals.enabledItemCategories.end()) continue;
+		// Update cached items with new positions
+		std::unique_lock lk(Globals.itemMutex);
+		for (size_t i = 0; i < existingActors.size(); ++i) {
+			auto it = cachedItems.find(existingActors[i]);
+			if (it != cachedItems.end()) {
+				it->second.Location = transforms[i].translation;
+				newCache[existingActors[i]] = it->second;
+			}
+		}
+	}
 
-        if (cat == EItemCategory::WEAPONS) {
-            if (Globals.enabledWeaponTypes.find(weaponTypes[i]) == Globals.enabledWeaponTypes.end()) continue;
-        }
+	// For new items: do full read (slow path, but only for new items)
+	if (newActors.empty()) {
+		std::unique_lock lk(Globals.itemMutex);
+		cachedItems = newCache;
+		if (debug)
+			std::cout << "ItemESP refreshed " << cachedItems.size() << " items (0 new)\n";
+		return;
+	}
 
-        newSet.insert(actor);
-    }
+	auto scatter = mem.CreateScatterHandle();
+	std::vector<FSolarItemData> itemData(newActors.size());
+	std::vector<EWeaponType> weaponTypes(newActors.size());
+	std::vector<uintptr_t> rootComps(newActors.size());
 
-    for (uintptr_t a : oldItemSet) {
-        if (newSet.find(a) == newSet.end()) cachedItems.erase(a);
-    }
+	for (size_t i = 0; i < newActors.size(); ++i) {
+		mem.AddScatterReadRequest(scatter, newActors[i] + Globals.offsets.FSolarItemData, &itemData[i], sizeof(FSolarItemData));
+		mem.AddScatterReadRequest(scatter, newActors[i] + Globals.offsets.WeaponTypes, &weaponTypes[i], sizeof(EWeaponType));
+		mem.AddScatterReadRequest(scatter, newActors[i] + Globals.offsets.RootComponent, &rootComps[i], sizeof(uintptr_t));
+	}
+	mem.ExecuteReadScatter(scatter);
 
-    
-    std::vector<uintptr_t> newItems;
-    for (uintptr_t a : newSet) {
-        if (oldItemSet.find(a) == oldItemSet.end()) {
-            newItems.push_back(a);
-        }
-    }
+	std::vector<FTransform> transforms(newActors.size());
+	for (size_t i = 0; i < newActors.size(); ++i) {
+		if (util::IsValidVA(rootComps[i])) {
+			mem.AddScatterReadRequest(scatter, rootComps[i] + Globals.offsets.componentToWorld,
+				&transforms[i], sizeof(FTransform));
+		}
+	}
+	mem.ExecuteReadScatter(scatter);
+	mem.CloseScatterHandle(scatter);
 
-    if (!newItems.empty()) {
-       
-        std::vector<FSolarItemData> newItemData(newItems.size());
-        std::vector<EWeaponType> newWeaponTypes(newItems.size());
+	// Collect valid NEW items to cache
+	std::vector<size_t> validIndices;
+	for (size_t i = 0; i < newActors.size(); ++i) {
+		if (itemData[i].ItemType == EItemType::NONE) continue;
+		validIndices.push_back(i);
+	}
 
-        auto stringScatter = mem.CreateScatterHandle();
-        for (size_t i = 0; i < newItems.size(); ++i) {
-            mem.AddScatterReadRequest(stringScatter, newItems[i] + 0x360, &newItemData[i], sizeof(FSolarItemData));
-            mem.AddScatterReadRequest(stringScatter, newItems[i] + 0x56c, &newWeaponTypes[i], sizeof(EWeaponType));
-        }
-        mem.ExecuteReadScatter(stringScatter);
-        mem.CloseScatterHandle(stringScatter);
+	// Batch read names for valid items
+	if (!validIndices.empty()) {
+		auto nameScatter = mem.CreateScatterHandle();
+		std::vector<std::vector<wchar_t>> stringBuffers(validIndices.size());
 
+		for (size_t j = 0; j < validIndices.size(); ++j) {
+			size_t i = validIndices[j];
+			const FString& fName = itemData[i].Name;
 
-        auto readFString = [&](const FString& f) -> std::string {
-            if (!f.IsValid() || f.Count <= 0 || f.Count > 128 || !util::IsValidVA((uintptr_t)f.Data))
-                return {};
-            std::vector<wchar_t> buf(f.Count + 1);
-            if (!mem.Read((uintptr_t)f.Data, buf.data(), f.Count * sizeof(wchar_t)))
-                return {};
-            buf[buf.size() - 1] = L'\0';
-            return std::string(buf.begin(), buf.end() - 1);
-            };
+			if (fName.IsValid() && fName.Count > 0 && fName.Count < 128 && util::IsValidVA((uintptr_t)fName.Data)) {
+				stringBuffers[j].resize(fName.Count + 1, 0);
+				mem.AddScatterReadRequest(nameScatter, (uintptr_t)fName.Data,
+					stringBuffers[j].data(), fName.Count * sizeof(wchar_t));
+			}
+		}
 
-        for (size_t i = 0; i < newItems.size(); ++i) {
-            ItemRenderer ir{};
-            ir.Actor = newItems[i];
-            ir.Item = newItemData[i].ItemType;
-            ir.Weapon = newWeaponTypes[i];
-            ir.Name = readFString(newItemData[i].Name);
-            cachedItems[newItems[i]] = std::move(ir);
-        }
-    }
+		mem.ExecuteReadScatter(nameScatter);
+		mem.CloseScatterHandle(nameScatter);
 
-    oldItemSet = std::move(newSet);
+		// Add new items to cache
+		for (size_t j = 0; j < validIndices.size(); ++j) {
+			size_t i = validIndices[j];
+
+			ItemRenderer ir;
+			ir.Actor = newActors[i];
+			ir.Item = itemData[i].ItemType;
+			ir.Weapon = weaponTypes[i];
+			ir.Location = transforms[i].translation;
+
+			if (!stringBuffers[j].empty()) {
+				std::wstring ws(stringBuffers[j].data());
+				ir.Name = std::string(ws.begin(), ws.end());
+			}
+
+			newCache[newActors[i]] = std::move(ir);
+		}
+	}
+
+	// Replace cache atomically
+	{
+		std::unique_lock lk(Globals.itemMutex);
+		cachedItems = std::move(newCache);
+	}
+
+	if (debug)
+		std::cout << "ItemESP refreshed " << cachedItems.size() << " items ("
+		          << newActors.size() << " new, " << existingActors.size() << " updated)\n";
 }
 
 
-void ItemESP::Render(const Camera& cam, int screenW, int screenH)
-{
-    extern struct _GameCache cache;
-    if (!Globals.itemsEnabled) return;
-    if (!util::IsValidVA(cache.CameraManager.load()) ||
-        !util::IsValidVA(cache.LocalPawn.load())) return;
+void ItemESP::Render(const Camera& cam, int screenW, int screenH) {
+	extern struct _GameCache cache;
+	if (!Globals.itemsEnabled) return;
+	if (!util::IsValidVA(cache.CameraManager.load()) || !util::IsValidVA(cache.LocalPawn.load())) return;
 
-   
-    std::vector<ItemRenderer> toRender;
-    {
-        std::unique_lock lk(Globals.itemMutex);
-        toRender.reserve(cachedItems.size());
-        for (auto& [actor, data] : cachedItems) toRender.push_back(data);
-    }
-    if (toRender.empty()) return;
+	std::vector<ItemRenderer> renderItems;
+	{
+		std::unique_lock lk(Globals.itemMutex);
+		renderItems.reserve(cachedItems.size());
 
-   
-    auto scatter = mem.CreateScatterHandle();
-    std::vector<uintptr_t> rootComp(toRender.size(), 0);
-    for (size_t i = 0; i < toRender.size(); ++i)
-        mem.AddScatterReadRequest(scatter, toRender[i].Actor + 0x1b0, &rootComp[i], sizeof(uintptr_t));
-    mem.ExecuteReadScatter(scatter);
 
-    std::vector<FTransform> world(toRender.size());
-    for (size_t i = 0; i < toRender.size(); ++i) {
-        if (util::IsValidVA(rootComp[i]))
-            mem.AddScatterReadRequest(scatter,
-                rootComp[i] + Globals.offsets.componentToWorld,
-                &world[i], sizeof(FTransform));
-    }
-    mem.ExecuteReadScatter(scatter);
-    mem.CloseScatterHandle(scatter);
+		FTransform dummy{};
+		dummy.translation = Vector3(0, 0, 0);
+		dummy.rot = { 0, 0, 0, 1 };
+		dummy.scale = { 1, 1, 1 };
 
-    
-    std::vector<ItemRenderer> renderItems;
-    renderItems.reserve(toRender.size());
+		for (const auto& [actor, cached] : cachedItems) {
+			// Filter by category
+			EItemCategory cat = GetItemCategory(cached.Item);
+			if (Globals.enabledItemCategories.find(cat) == Globals.enabledItemCategories.end()) continue;
 
-    for (size_t i = 0; i < toRender.size(); ++i) {
-        if (!util::IsValidVA(rootComp[i])) continue;
-        const auto& it = toRender[i];
-        ItemRenderer r = it;
-        r.Location = world[i].translation;
+			// Filter weapons by type
+			if (cat == EItemCategory::WEAPONS) {
+				if (Globals.enabledWeaponTypes.find(cached.Weapon) == Globals.enabledWeaponTypes.end()) continue;
+			}
 
-       
-        FTransform dummy{};
-        dummy.translation = Vector3(0, 0, 0);
-        dummy.rot = { 0,0,0,1 };
-        dummy.scale = { 1,1,1 };
-        
+			float dx = cached.Location.x - cam.Location.x;
+			float dy = cached.Location.y - cam.Location.y;
+			float dz = cached.Location.z - cam.Location.z;
+			float distanceSq = dx * dx + dy * dy + dz * dz;
+			float maxDistCm = Globals.MaxItemDistance * 100.0f;
 
-        r.W2S = doMatrix(dummy, world[i], cam, screenW, screenH);
+			if (distanceSq > maxDistCm * maxDistCm) continue;
 
-      
-        float dx = r.Location.x - cam.Location.x;
-        float dy = r.Location.y - cam.Location.y;
-        float dz = r.Location.z - cam.Location.z;
-        r.distance = std::sqrt(dx * dx + dy * dy + dz * dz) / 100.0f - 3.0f;
+			ItemRenderer r = cached;
 
-        renderItems.push_back(std::move(r));
-    }
+			FTransform worldTransform{};
 
-  
-    {
-        std::unique_lock lk(Globals.itemMutex);
-        Globals.renderItems = std::move(renderItems);
-    }
-    if (debug)
-        std::cout << "ItemESP rendered " << Globals.renderItems.size()
-        << " items this frame\n";
+			worldTransform.translation = cached.Location;
+			worldTransform.rot = { 0, 0, 0, 1 };
+			worldTransform.scale = { 1, 1, 1 };
+
+			r.W2S = doMatrix(dummy, worldTransform, cam, screenW, screenH);
+			r.distance = std::sqrt(distanceSq) / 100.0f - 3.0f;
+
+			renderItems.push_back(std::move(r));
+		}
+	}
+
+	{
+		std::unique_lock lk(Globals.itemMutex);
+		Globals.renderItems = std::move(renderItems);
+	}
+	if (debug)
+		std::cout << "ItemESP rendered " << Globals.renderItems.size()
+		<< " items this frame\n";
 }

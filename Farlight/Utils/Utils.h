@@ -353,10 +353,7 @@ inline Vector2 doMatrix(FTransform Bone, FTransform C2W, Camera camera, int scre
 }
 
 
-
-
  
-
 
 inline float GetCrossDistance(double x1, double y1, double x2, double y2) {
 	double dx = x2 - x1;

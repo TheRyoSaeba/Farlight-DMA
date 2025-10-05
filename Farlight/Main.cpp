@@ -26,7 +26,7 @@ int main()
 	 
  
 init:
-	if (!mem.Init(Globals.processName),true,false)
+	if (!mem.Init(Globals.processName))
 	{
 		std::cout << "Failed to initialize DMA" << std::endl;
 		system("pause");
@@ -35,8 +35,6 @@ init:
 
 	//DumpGame();
 	std::cout << "DMA initialized" << std::endl;
-
-
 
 
 	if (!mem.GetKeyboard()->InitKeyboard())
@@ -48,7 +46,6 @@ init:
 
 	 
 	 
-
 	if (!Aimbot::init())
 	{
 		std::cout << "Failed to initialize kmbox" << std::endl;
@@ -65,12 +62,15 @@ init:
 
 	}
 
+	 
+
+
+	std::cout << "\n Enjoy ! Refresh Cheat in Settings for any issues" << std::endl;
+
 	mem.FullRefresh();
 
 	std::thread(refreshMemory).detach();
 
-
-	std::cout << "\n Enjoy ! Refresh Cheat in Settings for any issues" << std::endl;
 
 	std::thread(Game::Loop).detach();
 
@@ -80,6 +80,8 @@ init:
 	render.Init();
 
 	render.Loop();
+ 
+
 
 	return 0;
 

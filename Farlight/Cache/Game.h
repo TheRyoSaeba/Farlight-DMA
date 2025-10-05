@@ -7,6 +7,7 @@
 #include <mutex>
 #include <unordered_map>
 #include <unordered_set>
+#include "bones.h"
 #include "ItemESP.h" 
  
  
@@ -51,8 +52,8 @@ enum class ECharacterHealthState : uint8_t
 struct  PlayerRender {
 	uintptr_t Actor = 0;
 	uintptr_t mesh = 0;
-	Vector2 headW2S;      
-	Vector2 bottomW2S;     
+	Vector2 headW2S;
+	Vector2 bottomW2S;
 	Vector3 Location;
 	float Health;
 	float distance;
@@ -61,6 +62,9 @@ struct  PlayerRender {
 	ECharacterHealthState AliveDeadorKnocked;
 
 	std::string Name;
+
+	SkeletonBones skeleton;
+	bool hasSkeletonData = false;
 };
 
  
@@ -73,14 +77,10 @@ struct _GameCache {
 	std::atomic<uintptr_t> PersistentLevel{ 0 };
 	std::atomic<uintptr_t> LocalPawn{ 0 };
 	std::atomic<uintptr_t> CameraManager{ 0 };
-	uintptr_t Array_Address = 0;
 	Camera LocalCamera{};
 	std::vector<uintptr_t> Actors;
 	std::vector<uintptr_t> lastActorList;
-	std::unordered_set<uintptr_t> cachedPlayerActors;
 	std::unordered_set<uintptr_t> cachedItemActors;
 	std::mutex cacheMutex;
-	std::chrono::steady_clock::time_point LastCoreUpdate{};
-	std::chrono::steady_clock::time_point LastPlayerUpdate{};
 };
 extern _GameCache cache;

@@ -285,7 +285,7 @@ static void DrawNamedColorPicker(const char* name, ImVec4& color)
         if (!preview.empty()) { preview.resize(preview.size() - 2); }
     }
 
-
+   
     StyleColorScope comboStyle({
         { ImGuiCol_Header, ImVec4(0.3f, 0.3f, 0.8f, 0.7f) },
         { ImGuiCol_HeaderHovered, ImVec4(0.4f, 0.4f, 1.0f, 0.8f) },
@@ -299,7 +299,7 @@ static void DrawNamedColorPicker(const char* name, ImVec4& color)
             bool selected = Globals.enabledItemCategories.count(category) > 0;
 
 
-            if (ImGui::Selectable(name, selected)) {
+             if (ImGui::Selectable(name, selected, ImGuiSelectableFlags_DontClosePopups)) {
                 if (selected) Globals.enabledItemCategories.erase(category);
                 else Globals.enabledItemCategories.insert(category);
             }
@@ -562,7 +562,7 @@ static void DrawNamedColorPicker(const char* name, ImVec4& color)
         ImGui::Text("Overlay Mode"); ImGui::NextColumn();
         const char* overlayModes[] = { "Transparent ESP", "Black Fuser" };
         if (ImGui::Combo("##overlaymode", &Globals.overlayMode, overlayModes, 2)) {
-            SetOverlayMode(Globals.overlayHWND, Globals.overlayMode == 0, Globals.sidebarOpen);
+            SetOverlayMode2(Globals.overlayHWND, Globals.overlayMode, Globals.sidebarOpen);
         }
         ImGui::NextColumn(); ImGui::NextColumn();
 
@@ -693,7 +693,9 @@ void DrawColorsTab() {
         ImGui::SliderFloat("##MaxAimdist", &Globals.settings.AimbotMaxDistance, 10.f, 1000.f, "%.0f m");
         ImGui::Columns(1);
         ImGui::Spacing();
-        ImGui::Text("FOV"); ImGui::NextColumn(); ImGui::SliderFloat("##aimbot_fov", &Globals.settings.fov, 90.0f, 360.0f, "%.1f°"); HoverTooltip("Field of View for aimbot"); ImGui::NextColumn();
+        ImGui::Text("FOV");
+        ImGui::SliderFloat("##aimbot_fov", &Globals.settings.fov, 10.0f, 180.0f, "%.0fÂ°");
+        HoverTooltip("Field of View for aimbot in degrees");
 
         });
 

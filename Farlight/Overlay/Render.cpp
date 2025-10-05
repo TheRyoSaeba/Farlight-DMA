@@ -4,6 +4,7 @@
 #define NOMINMAX
 #include <Overlay/Render.h>
 #include <Utils/Globals.h>
+#include <Cache/bones.h>
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -19,13 +20,23 @@
 #include <resource.h>
 #include <DMALibrary/Memory/Memory.h>
 
+#pragma comment(lib, "Winmm.lib")
 
 void DrawSidebar();
 
-//DRAWING SECTION 
+//DRAWING SECTION
 //TODO Move Drawbox from CFMANAGER
 //draw box decide color  and thickness based on teamid
 
+void DrawLine(ImVec2 start, ImVec2 end, ImColor color, float thickness = 1.5f) {
+	ImGui::GetForegroundDrawList()->AddLine(start, end, color, thickness);
+}
+
+void DrawSkeleton(const SkeletonBones& skeleton, ImColor color, float thickness = 1.5f) {
+	DrawSkeletonLines(skeleton, [&](const Vector2& from, const Vector2& to) {
+		DrawLine(ImVec2(from.x, from.y), ImVec2(to.x, to.y), color, thickness);
+	});
+}
 
 void DrawBox(Vector2 position, float width, float height, ImColor color, float thickness = 1.0f, int boxStyle = 0) {
 	ImVec2 tl(position.x - width / 2, position.y - height / 2);
@@ -136,16 +147,17 @@ void DrawItemDistanceText(Vector2 position, float distance, ImColor color)
 	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, tp, color, txt.c_str());
 }
 
-
-// --- RENDERING SECTION
+ 
 
 void Render::Loop() {
 		auto* draw = ImGui::GetForegroundDrawList();
 
+		float fovPixels = (Globals.settings.fov / 180.0f) * (Globals.screenWidth * 0.5f);
+
 		if (Globals.settings.fov > 0) {
 			draw->AddCircle(
 				ImVec2(Globals.screenWidth / 2, Globals.screenHeight / 2),
-				Globals.settings.fov,
+				fovPixels,
 				ImColor(Globals.ColorFOV), 
 				50,
 				Globals.LineThickness
@@ -176,12 +188,13 @@ void Render::Loop() {
 				DrawNames(Vector2(player.headW2S.x, player.headW2S.y - 12),
 					player.Name, Globals.ColorName);
 
-			 
 
-			if (Globals.DrawBones)
-			//	DrawSkeleton(player.Skeleton, Globals.ColorBones, Globals.LineThickness);
 
-				if (Globals.DrawHP) {
+
+			if (Globals.DrawBones && player.hasSkeletonData)
+				DrawSkeleton(player.skeleton, Globals.ColorBones, Globals.LineThickness);
+
+			if (Globals.DrawHP) {
 					float boxCenterY = (player.headW2S.y + player.bottomW2S.y) / 2.0f;
 					float boxLeft = player.bottomW2S.x - (boxWidth / 2.0f);
 					const float barWidth = 6.0f;
@@ -234,6 +247,7 @@ void Render::Loop() {
 	 
 }
 
+
 // Data
 static ID3D11Device* g_pd3dDevice = nullptr;
 static ID3D11DeviceContext* g_pd3dDeviceContext = nullptr;
@@ -252,14 +266,13 @@ void CreateRenderTarget()
 
 bool CreateDeviceD3D(HWND hWnd)
 {
-	// Setup swap chain
 	DXGI_SWAP_CHAIN_DESC sd;
 	ZeroMemory(&sd, sizeof(sd));
 	sd.BufferCount = 2;
 	sd.BufferDesc.Width = 0;
 	sd.BufferDesc.Height = 0;
 	sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	sd.BufferDesc.RefreshRate.Numerator = 165;
+	sd.BufferDesc.RefreshRate.Numerator = 0;
 	sd.BufferDesc.RefreshRate.Denominator = 1;
 	sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -268,7 +281,6 @@ bool CreateDeviceD3D(HWND hWnd)
 	sd.SampleDesc.Quality = 0;
 	sd.Windowed = TRUE;
 	sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-
 
 	UINT createDeviceFlags = 0;
 	//createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
@@ -297,14 +309,14 @@ void CleanupDeviceD3D()
 	if (g_pd3dDevice) { g_pd3dDevice->Release(); g_pd3dDevice = nullptr; }
 }
 
-std::vector<unsigned char> LoadResourceData(int resourceId)
+inline std::vector<unsigned char> LoadResourceData(int resourceId)
 {
 	// 1️⃣  Find the resource – numeric type (RT_RCDATA) and *no* language filter
 	//     (generic FindResource automatically selects the right language).
 	HRSRC hRes = FindResource(
-		nullptr,                 
-		MAKEINTRESOURCE(resourceId),  
-		RT_RCDATA);             
+		nullptr,
+		MAKEINTRESOURCE(resourceId),
+		RT_RCDATA);
 
 	if (!hRes) {
 		std::cout << "FindResource failed for ID " << resourceId
@@ -312,7 +324,7 @@ std::vector<unsigned char> LoadResourceData(int resourceId)
 		return {};
 	}
 
-	 
+
 	HGLOBAL hGlob = LoadResource(nullptr, hRes);
 	if (!hGlob) return {};
 
@@ -320,29 +332,26 @@ std::vector<unsigned char> LoadResourceData(int resourceId)
 	const void* p = LockResource(hGlob);
 	if (!p || size == 0) return {};
 
-	 
+
 	const unsigned char* bytes = static_cast<const unsigned char*>(p);
 	return std::vector<unsigned char>(bytes, bytes + size);
 }
 
-
-ImFont* LoadFontFromResource(int resourceId, float fontSize, ImGuiIO& io) {
+inline  ImFont* LoadFontFromResource(int resourceId, float fontSize, ImGuiIO& io) {
 	std::vector<unsigned char> fontData = LoadResourceData(resourceId);
 	if (fontData.empty()) return nullptr;
 
-	 
+
 	void* fontMemory = IM_ALLOC(fontData.size());
 	memcpy(fontMemory, fontData.data(), fontData.size());
 
 	ImFontConfig config;
-	config.FontDataOwnedByAtlas = true;  
+	config.FontDataOwnedByAtlas = true;
 
 	return io.Fonts->AddFontFromMemoryTTF(fontMemory, fontData.size(), fontSize, &config);
 }
 
-
-
-bool LoadTextureFromFile(const char* file_name, ID3D11ShaderResourceView** out_srv, int* out_width, int* out_height)
+inline  bool LoadTextureFromFile(const char* file_name, ID3D11ShaderResourceView** out_srv, int* out_width, int* out_height)
 {
 	FILE* f = fopen(file_name, "rb");
 	if (f == NULL)
@@ -360,7 +369,7 @@ bool LoadTextureFromFile(const char* file_name, ID3D11ShaderResourceView** out_s
 	fread(file_data, 1, file_size, f);
 	fclose(f);
 
- 
+
 	int image_width = 0;
 	int image_height = 0;
 	unsigned char* image_data = stbi_load_from_memory((const unsigned char*)file_data, (int)file_size, &image_width, &image_height, NULL, 4);
@@ -369,7 +378,7 @@ bool LoadTextureFromFile(const char* file_name, ID3D11ShaderResourceView** out_s
 	if (image_data == NULL)
 		return false;
 
- 
+
 	D3D11_TEXTURE2D_DESC desc;
 	ZeroMemory(&desc, sizeof(desc));
 	desc.Width = image_width;
@@ -394,7 +403,7 @@ bool LoadTextureFromFile(const char* file_name, ID3D11ShaderResourceView** out_s
 		return false;
 	}
 
- 
+
 	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
 	ZeroMemory(&srvDesc, sizeof(srvDesc));
 	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -411,18 +420,19 @@ bool LoadTextureFromFile(const char* file_name, ID3D11ShaderResourceView** out_s
 
 	return SUCCEEDED(hr);
 }
-bool LoadTextureFromResource(int resourceId, ID3D11ShaderResourceView** out_srv, int* out_width, int* out_height) {
+
+inline  bool LoadTextureFromResource(int resourceId, ID3D11ShaderResourceView** out_srv, int* out_width, int* out_height) {
 	std::vector<unsigned char> imageData = LoadResourceData(resourceId);
 	if (imageData.empty()) return false;
 
-	 
+
 	int image_width = 0;
 	int image_height = 0;
 	unsigned char* decoded_data = stbi_load_from_memory(imageData.data(), imageData.size(), &image_width, &image_height, NULL, 4);
 
 	if (decoded_data == NULL) return false;
 
-	 
+
 	D3D11_TEXTURE2D_DESC desc;
 	ZeroMemory(&desc, sizeof(desc));
 	desc.Width = image_width;
@@ -447,7 +457,7 @@ bool LoadTextureFromResource(int resourceId, ID3D11ShaderResourceView** out_srv,
 		return false;
 	}
 
- 
+
 	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
 	ZeroMemory(&srvDesc, sizeof(srvDesc));
 	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -464,12 +474,31 @@ bool LoadTextureFromResource(int resourceId, ID3D11ShaderResourceView** out_srv,
 
 	return SUCCEEDED(hr);
 }
+
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 
+void SetOverlayMode(HWND hwnd, int mode, bool menuVisible) {
+	bool transparent = (mode == 0);
+	MARGINS m = transparent ? MARGINS{ -1,-1,-1,-1 } : MARGINS{ 0,0,0,0 };
+	DwmExtendFrameIntoClientArea(hwnd, &m);
 
-//no overload
-void SetOverlayMode2(HWND hwnd, bool showMenu, int overlayMode)
+	LONG style = GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW |
+		(transparent ? (WS_EX_LAYERED | WS_EX_TOPMOST | (!menuVisible ? WS_EX_TRANSPARENT : 0)) :
+			(menuVisible ? 0 : (WS_EX_TRANSPARENT | WS_EX_NOACTIVATE)));
+
+	SetWindowLong(hwnd, GWL_EXSTYLE, style);
+
+	if (transparent) {
+		SetLayeredWindowAttributes(hwnd, 0, 255, LWA_COLORKEY | LWA_ALPHA);
+	}
+	else {
+		SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | (!menuVisible ? SWP_NOACTIVATE : 0));
+	}
+}
+
+ void SetOverlayMode2(HWND hwnd, int overlayMode, bool showMenu)
 {
 	LONG style = GetWindowLong(hwnd, GWL_EXSTYLE);
 
@@ -480,7 +509,7 @@ void SetOverlayMode2(HWND hwnd, bool showMenu, int overlayMode)
 		// Transparent Mode
 
 
-		MARGINS margins = { 0, 0, Globals.screenWidth, Globals.screenHeight };
+		MARGINS margins = { -1, -1, -1, -1 };
 		DwmExtendFrameIntoClientArea(hwnd, &margins);
 
 		if (showMenu) {
@@ -528,79 +557,15 @@ void SetOverlayMode2(HWND hwnd, bool showMenu, int overlayMode)
 
 	SetWindowLong(hwnd, GWL_EXSTYLE, style);
 }
-void SetOverlayMode(HWND hwnd, bool isTransparent, bool menuVisible)
-{
-	LONG style = GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW;
 
-	if (isTransparent) {
-		MARGINS margins = { -1, -1, -1, -1 };
-		DwmExtendFrameIntoClientArea(hwnd, &margins);
 
-		style |= WS_EX_TOPMOST | WS_EX_LAYERED;
-		style = menuVisible ? style & ~WS_EX_TRANSPARENT : style | WS_EX_TRANSPARENT;
-
-		SetWindowLong(hwnd, GWL_EXSTYLE, style);
-		SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 255, LWA_COLORKEY | LWA_ALPHA);
-	}
-	else {
-		MARGINS margins = { 0, 0, 0, 0 };
-		DwmExtendFrameIntoClientArea(hwnd, &margins);
-
-		if (menuVisible) {
-			style &= ~(WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE);
-			SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-		}
-		else {
-			style &= ~WS_EX_LAYERED;
-			style |= WS_EX_TRANSPARENT | WS_EX_NOACTIVATE;
-			SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
-				SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-		}
-
-		SetWindowLong(hwnd, GWL_EXSTYLE, style);
-	}
+void SwitchToMonitor(HWND hwnd, int idx) {
+	DISPLAY_DEVICE dd{ sizeof(dd) }; DEVMODE dm{ sizeof(dm) };
+	EnumDisplayDevices(NULL, idx, &dd, 0) && EnumDisplaySettings(dd.DeviceName, ENUM_CURRENT_SETTINGS, &dm) &&
+		SetWindowPos(hwnd, HWND_TOPMOST, dm.dmPosition.x, dm.dmPosition.y, dm.dmPelsWidth, dm.dmPelsHeight, SWP_NOACTIVATE);
 }
 
-
-
-
-void SwitchToMonitor(HWND hwnd, int monitorIndex) {
-	DISPLAY_DEVICE dd = { sizeof(dd) };
-	if (EnumDisplayDevices(NULL, monitorIndex, &dd, 0)) {
-		DEVMODE dm = { sizeof(dm) };
-		if (EnumDisplaySettings(dd.DeviceName, ENUM_CURRENT_SETTINGS, &dm)) {
-			SetWindowPos(hwnd, HWND_TOPMOST,
-				dm.dmPosition.x, dm.dmPosition.y,
-				dm.dmPelsWidth, dm.dmPelsHeight,
-				SWP_NOACTIVATE);
-		}
-	}
-}
-
-
-void DrawSimpleSettings() {
-	// Monitor selection
-	static int currentMonitor = 0;
-	int monitorCount = GetSystemMetrics(SM_CMONITORS);
-	if (ImGui::Combo("Monitor", &currentMonitor,
-		[](void*, int idx, const char** out) {
-			static char buf[32];
-			sprintf(buf, "Monitor %d", idx + 1);
-			*out = buf;
-			return true;
-		}, nullptr, monitorCount)) {
-		SwitchToMonitor(Globals.overlayHWND, currentMonitor);
-	}
-
-	// Overlay mode selection
-	static int overlayMode = 0; // 0 = transparent, 1 = black
-	const char* modes[] = { "Transparent ESP", "Black Fuser" };
-	if (ImGui::Combo("Mode", &overlayMode, modes, 2)) {
-		Globals.overlayMode = overlayMode;
-		SetOverlayMode(Globals.overlayHWND, overlayMode == 0, Globals.sidebarOpen);
-	}
-}
-
+ 
 
 void Render::Init() {
 	WNDCLASSEXW wc = { sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L,
@@ -617,14 +582,19 @@ void Render::Init() {
 
 	Globals.overlayHWND = hwnd;
 
-	 
-	SetOverlayMode(Globals.overlayHWND, Globals.overlayMode,Globals.sidebarOpen);
 
-	 
-	if (!CreateDeviceD3D(hwnd))
-	{
+	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_IDLE);
+	SetPriorityClass(GetCurrentProcess(), IDLE_PRIORITY_CLASS);
+
+	BOOL compositionEnabled = FALSE;
+	DwmSetWindowAttribute(Globals.overlayHWND, DWMWA_EXCLUDED_FROM_PEEK, &compositionEnabled, sizeof(compositionEnabled));
+	DwmSetWindowAttribute(Globals.overlayHWND, DWMWA_DISALLOW_PEEK, &compositionEnabled, sizeof(compositionEnabled));
+
+	SetOverlayMode2(Globals.overlayHWND, Globals.overlayMode, Globals.sidebarOpen);
+
+	if (!CreateDeviceD3D(hwnd)) {
 		CleanupDeviceD3D();
-		::UnregisterClassW(wc.lpszClassName, wc.hInstance);
+		UnregisterClassW(wc.lpszClassName, wc.hInstance);
 		return;
 	}
 
@@ -682,10 +652,9 @@ void Render::Init() {
 	 
  
 	bool done = false;
-	while (!done)
+	while (!done && Globals.running)
 	{
-		// Po and handle messages (inputs, window resize, etc.)
-		// See the WndProc() function below for our to dispatch events to the Win32 backend.
+
 		MSG msg;
 		while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
 		{
@@ -694,10 +663,10 @@ void Render::Init() {
 			if (msg.message == WM_QUIT)
 				done = true;
 		}
-		if (done)
+		if (done || !Globals.running)
 			break;
 
-		// Handle window being minimized or screen locked
+		
 		if (g_SwapChainOccluded && g_pSwapChain->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED)
 		{
 			::Sleep(10);
@@ -705,7 +674,7 @@ void Render::Init() {
 		}
 		g_SwapChainOccluded = false;
 
-		// Handle window resize (we don't resize directly in the WM_SIZE handler)
+		 
 		if (g_ResizeWidth != 0 && g_ResizeHeight != 0)
 		{
 			CleanupRenderTarget();
@@ -715,23 +684,21 @@ void Render::Init() {
 		}
 
 		 
-		// Start the Dear ImGui frame
+		
 		ImGui_ImplDX11_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
 		Render::Loop();
 
-		// Rendering
+	
 		ImGui::Render();
 
 		ImVec4 clear_color;
-		if (Globals.overlayMode == 0) {
-			// Transparent mode - clear with transparent
-			clear_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+		if (Globals.overlayMode == 0) {clear_color = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
 		}
 		else {
-			// Fuser mode - clear with black
+			
 			clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
 		}
 		 
@@ -740,15 +707,31 @@ void Render::Init() {
 		g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear_color_with_alpha);
 		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-		// Present
-		HRESULT hr = g_pSwapChain->Present(0, 0);   // Present with vsync
-		//HRESULT hr = g_pSwapChain->Present(0, 0); // Present without vsync
+		
+		HRESULT hr = g_pSwapChain->Present(Globals.vsync == 1 ? 1 : 0, 0); 
+		if (!Globals.vsync && Globals.fps_limit > 0) {
+			static auto lastFrameTime = std::chrono::high_resolution_clock::now();
+
+			auto currentTime = std::chrono::high_resolution_clock::now();
+			double elapsedTime = std::chrono::duration<double>(currentTime - lastFrameTime).count();
+
+			const double frameTime = 1.0 / (double)Globals.fps_limit;
+			if (elapsedTime < frameTime) {
+				DWORD sleepTime = static_cast<DWORD>((frameTime - elapsedTime) * 1000);
+
+				timeBeginPeriod(1);
+				Sleep(sleepTime);
+				timeEndPeriod(1);
+			}
+
+			lastFrameTime = std::chrono::high_resolution_clock::now();
+		}
+
+		
 		g_SwapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
 	}
 
-	
-
-	// Cleanup
+ 
 	ImGui_ImplDX11_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();

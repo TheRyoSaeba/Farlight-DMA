@@ -1,7 +1,8 @@
 ﻿#define NOMINMAX
 #include <Cache/Game.h>
+#include <Cache/bones.h>
 #include <algorithm>
-#include "ItemESP.h"  
+#include "ItemESP.h"
 #include <Utils/Utils.h>
 #include <DMALibrary/Memory/Memory.h>
 #include <Utils/Globals.h>
@@ -79,31 +80,30 @@ bool Get_Uworld() {
     return (util::IsValidVA(Globals.offsets.uworld) && util::IsValidVA(Globals.offsets.GNAMES));
 
 };
-//updatecore spam 
+
 
 void Game::Loop() {
-    UpdateCore(true);
 
+    UpdateCore(true);
 
     std::thread(Game::UpdateActorsLoop).detach();
 
     ItemESP::Start(true);
+
+  
      
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     
     auto processFrame = [&]() -> bool {
+        static bool debugBones = false;
 
         UpdateLocal(false);
-
         UpdateAttributes(false);
 
         if (!util::IsValidVA(cache.LocalPawn.load()) || !util::IsValidVA(cache.PersistentLevel.load()))
             return false;
 
-
-        ItemESP::Render(cache.LocalCamera, Globals.screenWidth, Globals.screenHeight);
-
-
+		 
         std::vector<uintptr_t> actorsCopy;
         {
             std::unique_lock cacheLock(cache.cacheMutex);
@@ -112,15 +112,18 @@ void Game::Loop() {
 
         if (actorsCopy.size() <= 2) return false;
 
-       
+        ItemESP::Render(cache.LocalCamera, Globals.screenWidth, Globals.screenHeight);
+
+
         auto scatter = mem.CreateScatterHandle();
 
         struct PlayerFrameData {
-            uintptr_t mesh;
-            TArray<FTransform> boneArray;
-            FTransform componentToWorld;
-            FTransform headBone; 
-            FTransform rootBone;
+            uintptr_t mesh = 0;
+            TArray<FTransform> boneArray{};
+            FTransform componentToWorld{};
+            FTransform headBone{};
+            FTransform rootBone{};
+            std::unordered_map<int, FTransform> skeletonBones;
         };
 
         std::vector<PlayerFrameData> frameData(actorsCopy.size());
@@ -131,21 +134,35 @@ void Game::Loop() {
             mem.AddScatterReadRequest(scatter, actorsCopy[i] + Globals.offsets.mesh, &frameData[i].mesh, sizeof(uintptr_t));
         }
         mem.ExecuteReadScatter(scatter);
-
+        auto scatterEnd = std::chrono::high_resolution_clock::now();
       
         for (size_t i = 0; i < actorsCopy.size(); i++) {
             if (!util::IsValidVA(frameData[i].mesh)) continue;
             mem.AddScatterReadRequest(scatter, frameData[i].mesh + Globals.offsets.boneArray, &frameData[i].boneArray, sizeof(TArray<FTransform>));
             mem.AddScatterReadRequest(scatter, frameData[i].mesh + Globals.offsets.componentToWorld, &frameData[i].componentToWorld, sizeof(FTransform));
         }
+       
         mem.ExecuteReadScatter(scatter);
+      
 
-        
         for (size_t i = 0; i < actorsCopy.size(); i++) {
             if (!frameData[i].boneArray.isValid() || frameData[i].boneArray.Num() <= 7) continue;
             uintptr_t boneArrayAddr = frameData[i].boneArray.getAddress();
+
             mem.AddScatterReadRequest(scatter, boneArrayAddr + (0 * sizeof(FTransform)), &frameData[i].rootBone, sizeof(FTransform));
-            mem.AddScatterReadRequest(scatter, boneArrayAddr + (7 * sizeof(FTransform)), &frameData[i].headBone, sizeof(FTransform));
+
+            if (Globals.DrawBones && frameData[i].boneArray.Num() >= 70) {
+               
+                frameData[i].skeletonBones.reserve(SKELETON_BONES.size());
+                for (BoneID bone : SKELETON_BONES) {
+                    int boneIdx = static_cast<int>(bone);
+                    mem.AddScatterReadRequest(scatter, boneArrayAddr + (boneIdx * sizeof(FTransform)),
+                        &frameData[i].skeletonBones[boneIdx], sizeof(FTransform));
+                }
+            } else {
+                
+                mem.AddScatterReadRequest(scatter, boneArrayAddr + (7 * sizeof(FTransform)), &frameData[i].headBone, sizeof(FTransform));
+            }
         }
         mem.ExecuteReadScatter(scatter);
         mem.CloseScatterHandle(scatter);
@@ -164,75 +181,69 @@ void Game::Loop() {
                 return std::sqrt(dx * dx + dy * dy + dz * dz) / 100.0f;
                 };
 
-            Vector2 head = doMatrix(frameData[i].headBone, frameData[i].componentToWorld, cache.LocalCamera, Globals.screenWidth, Globals.screenHeight);
             Vector2 root = doMatrix(frameData[i].rootBone, frameData[i].componentToWorld, cache.LocalCamera, Globals.screenWidth, Globals.screenHeight);
 
             PlayerRender pr{};
             pr.Actor = actorsCopy[i];
             pr.mesh = frameData[i].mesh;
-            pr.headW2S = head;
             pr.bottomW2S = root;
             pr.distance = calcDistance(frameData[i].componentToWorld.translation);
 
+            if (Globals.DrawBones && !frameData[i].skeletonBones.empty()) {
+                pr.hasSkeletonData = true;
+                PopulateSkeletonBones(pr.skeleton, frameData[i].skeletonBones,
+                    [&](const FTransform& bone) {
+                        return doMatrix(bone, frameData[i].componentToWorld, cache.LocalCamera, Globals.screenWidth, Globals.screenHeight);
+                    });
+                pr.headW2S = pr.skeleton.head;
+
+            } else {
+
+                Vector2 head = doMatrix(frameData[i].headBone, frameData[i].componentToWorld, cache.LocalCamera, Globals.screenWidth, Globals.screenHeight);
+                pr.headW2S = head;
+            }
+
             playerSnapshot.push_back(std::move(pr));
         }
-
-       
         {
             std::unique_lock lock(Globals.playerMutex);
+            std::shared_lock attrLock(AttributeMutex);
 
-            
             std::unordered_set<uintptr_t> currentSet(actorsCopy.begin(), actorsCopy.end());
             Globals.renderPlayers.erase(
                 std::remove_if(Globals.renderPlayers.begin(), Globals.renderPlayers.end(),
-                    [&](const PlayerRender& p) {
-                        return p.Actor && currentSet.find(p.Actor) == currentSet.end();
-                    }),
+                    [&](const PlayerRender& p) { return !currentSet.count(p.Actor); }),
                 Globals.renderPlayers.end()
             );
 
-          
-            std::unordered_map<uintptr_t, size_t> idx;
-            idx.reserve(Globals.renderPlayers.size() + playerSnapshot.size());
-            for (size_t i = 0; i < Globals.renderPlayers.size(); ++i)
-                idx.emplace(Globals.renderPlayers[i].Actor, i);
+            std::unordered_map<uintptr_t, PlayerRender*> renderMap;
+            std::for_each(Globals.renderPlayers.begin(), Globals.renderPlayers.end(),
+                [&](PlayerRender& p) { renderMap[p.Actor] = &p; });
 
-          
-            std::shared_lock attrLock(AttributeMutex);
+            auto applyAttributes = [&](PlayerRender& pr) {
+                if (auto ait = AttributeCache.find(pr.Actor); ait != AttributeCache.end()) {
+                    pr.TeamId = ait->second.TeamId;
+                    pr.AliveDeadorKnocked = ait->second.AliveDeadorKnocked;
+                    pr.Health = ait->second.Health;
+                    pr.Name = ait->second.Name;
+                }
+                };
 
-            for (auto& pr : playerSnapshot) {
-                auto it = idx.find(pr.Actor);
-                if (it != idx.end()) {
-                    PlayerRender& existing = Globals.renderPlayers[it->second];
-                  
-                    existing.mesh = pr.mesh;
-                    existing.headW2S = pr.headW2S;
-                    existing.bottomW2S = pr.bottomW2S;
-                    existing.distance = pr.distance;
-
-                    
-                    auto ait = AttributeCache.find(pr.Actor);
-                    if (ait != AttributeCache.end()) {
-                        existing.TeamId = ait->second.TeamId;
-                        existing.AliveDeadorKnocked = ait->second.AliveDeadorKnocked;
-                        existing.Health = ait->second.Health;
-                        existing.Name = ait->second.Name;
-                    }
+            std::for_each(playerSnapshot.begin(), playerSnapshot.end(), [&](PlayerRender& pr) {
+                if (auto it = renderMap.find(pr.Actor); it != renderMap.end()) {
+                    it->second->mesh = pr.mesh;
+                    it->second->headW2S = pr.headW2S;
+                    it->second->bottomW2S = pr.bottomW2S;
+                    it->second->distance = pr.distance;
+                    it->second->skeleton = pr.skeleton;
+                    it->second->hasSkeletonData = pr.hasSkeletonData;
+                    applyAttributes(*it->second);
                 }
                 else {
-                   
-                    PlayerRender combined = pr;
-                    auto ait = AttributeCache.find(pr.Actor);
-                    if (ait != AttributeCache.end()) {
-                        combined.TeamId = ait->second.TeamId;
-                        combined.AliveDeadorKnocked = ait->second.AliveDeadorKnocked;
-                        combined.Health = ait->second.Health;
-                        combined.Name = ait->second.Name;
-                    }//f
-                    Globals.renderPlayers.push_back(std::move(combined));
-                    idx.emplace(Globals.renderPlayers.back().Actor, Globals.renderPlayers.size() - 1);
+                    applyAttributes(pr);
+                    Globals.renderPlayers.push_back(std::move(pr));
                 }
-            }
+                });
         }
 
         Vector2 best{ 0.f, 0.f };
@@ -242,13 +253,14 @@ void Game::Loop() {
         uintptr_t localPawn = cache.LocalPawn.load();
 
         for (const auto& pr : Globals.renderPlayers) {
-            if (pr.Actor == localPawn) continue;                              
+            if (pr.Actor == localPawn) continue;
             if (!util::IsValidVA(pr.mesh)) continue;
+            if (pr.AliveDeadorKnocked == ECharacterHealthState::ECHS_Dead) continue;
             if (Globals.settings.IgnoreKnocked && pr.AliveDeadorKnocked == ECharacterHealthState::ECHS_Knocked) continue;
             if (pr.distance > Globals.settings.AimbotMaxDistance) continue;
-            if (pr.distance <= 0.01f) continue;    
+            if (pr.distance <= 0.01f) continue;
 
-         
+
             if (!std::isfinite(pr.headW2S.x) || !std::isfinite(pr.headW2S.y)) continue;
             if (pr.headW2S.x < 0.0f || pr.headW2S.x > Globals.screenWidth ||
                 pr.headW2S.y < 0.0f || pr.headW2S.y > Globals.screenHeight) {
@@ -258,6 +270,7 @@ void Game::Loop() {
             Vector2 targetPoint;
             if (Globals.TargetPriority == ETargetPriority::Head) {
                 targetPoint = pr.headW2S;
+                targetPoint.y += 5.0f;
             }
             else {
                 const float t = 0.5f;
@@ -271,7 +284,9 @@ void Game::Loop() {
             float d = GetCrossDistance(targetPoint.x, targetPoint.y,
                 Globals.screenWidth / 2.0f, Globals.screenHeight / 2.0f);
 
-            if (d < Globals.settings.fov && d < bestDist) {
+            float fovPixels = (Globals.settings.fov / 180.0f) * (Globals.screenWidth * 0.5f);
+
+            if (d < fovPixels && d < bestDist) {
                 bestDist = d;
                 best = targetPoint;
                 bestMesh = pr.mesh;
@@ -281,9 +296,11 @@ void Game::Loop() {
         if (util::IsValidVA(bestMesh))
             Aimbot::aimbot(best);
 
+        
+
         return true; };
 
-   
+      
 
     // Main loop
     static double avgMs = 16.0;
@@ -311,8 +328,9 @@ void Game::UpdateCore(bool debug) {
     Globals.renderPlayers.clear();
     Globals.renderItems.clear();
 
+    auto base = mem.GetBaseDaddy(Globals.processName);
     auto readCoreData = [&]() -> std::optional<std::tuple<uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t>> {
-        uintptr_t newUWorld = mem.Read<uintptr_t>(mem.baseAddress + Globals.offsets.uworld);
+        uintptr_t newUWorld = mem.Read<uintptr_t>(base + Globals.offsets.uworld);
         if (!util::IsValidVA(newUWorld))  return std::nullopt;
 
         auto core_handle = mem.CreateScatterHandle();
@@ -367,79 +385,69 @@ void Game::UpdateActorsLoop() {
     }
 }
 
+ 
+
+
 void Game::UpdateActors(bool debug) {
     uintptr_t uWorldCheck = mem.Read<uintptr_t>(mem.baseAddress + Globals.offsets.uworld);
-    if (!util::IsValidVA(uWorldCheck) || uWorldCheck != cache.UWorld.load()) {
-        UpdateCore(false);
-        return;
-    }
 
-    uintptr_t uLevelCheck = mem.Read<uintptr_t>(uWorldCheck + Globals.offsets.persistentlevel);
-    if (!util::IsValidVA(uLevelCheck) || uLevelCheck != cache.PersistentLevel.load()) {
-        UpdateCore(false);
-        return;
-    }
+    if (util::IsValidVA(uWorldCheck) && uWorldCheck == cache.UWorld.load()) {
+        uintptr_t uLevelCheck = mem.Read<uintptr_t>(uWorldCheck + Globals.offsets.persistentlevel);
 
-    TArray<uintptr_t> actorArray = mem.Read<TArray<uintptr_t>>(cache.PersistentLevel + Globals.offsets.AActors);
-    if (!actorArray.isValid() || actorArray.Num() == 0) return;
+        if (util::IsValidVA(uLevelCheck) && uLevelCheck == cache.PersistentLevel.load()) {
+            TArray<uintptr_t> actorArray = mem.Read<TArray<uintptr_t>>(cache.PersistentLevel + Globals.offsets.AActors);
 
-    std::vector<uintptr_t> currentActors(actorArray.Num());
-    if (!mem.Read(actorArray.getAddress(), currentActors.data(), currentActors.size() * sizeof(uintptr_t))) return;
+            if (actorArray.isValid() && actorArray.Num() > 0) {
+                std::vector<uintptr_t> rawActors(actorArray.Num());
+                if (!mem.Read(actorArray.getAddress(), rawActors.data(), rawActors.size() * sizeof(uintptr_t))) return;
 
-    
-    std::unordered_set<uintptr_t> currentSet(currentActors.begin(), currentActors.end());
-    std::unordered_set<uintptr_t> lastSet(cache.lastActorList.begin(), cache.lastActorList.end());
+                std::vector<uintptr_t> validPlayers;
+                std::unordered_set<uintptr_t> validItems;
+                std::vector<int> nameIDs(rawActors.size());
 
-    std::vector<uintptr_t> removed, added;
-    std::set_difference(lastSet.begin(), lastSet.end(), currentSet.begin(), currentSet.end(), std::back_inserter(removed));
-    std::set_difference(currentSet.begin(), currentSet.end(), lastSet.begin(), lastSet.end(), std::back_inserter(added));
+                auto scatter = mem.CreateScatterHandle();
+                for (size_t i = 0; i < rawActors.size(); i++) {
+                    if (util::IsValidVA(rawActors[i]) && rawActors[i] != cache.LocalPawn.load()) {
+                        mem.AddScatterReadRequest(scatter, rawActors[i] + 0x18, &nameIDs[i], sizeof(int));
+                    }
+                }
+                mem.ExecuteReadScatter(scatter);
+                mem.CloseScatterHandle(scatter);
 
-  
-    for (uintptr_t actor : removed) {
-        cache.cachedPlayerActors.erase(actor);
-        cache.cachedItemActors.erase(actor);
-    }
+                for (size_t i = 0; i < rawActors.size(); i++) {
+                    if (nameIDs[i] <= 0) continue;
 
-   
-    auto processNewActor = [&](uintptr_t actor) -> std::pair<bool, bool> {
-        if (!util::IsValidVA(actor) || actor == cache.LocalPawn.load()) return { false, false };
+                    std::string name = CacheFNAME(nameIDs[i]);
+                    if (name.empty()) continue;
 
+                    bool isPlayer = (name.find("BP_Character") != std::string::npos ||
+                                    name.find("SolarCharacter") != std::string::npos);
 
-        int nameID = mem.Read<int>(actor + 0x18);
-        if (nameID <= 0) return { false, false };
+                    if (isPlayer) {
+                        validPlayers.push_back(rawActors[i]);
+                    }
+                    else if (Globals.itemsEnabled) {
+                        validItems.insert(rawActors[i]);
+                    }
+                }
 
-        std::string name = CacheFNAME(nameID);
-        if (name.empty()) return { false, false };
+                if (debug) {
+                    std::cout << "Actor scan - Total: " << rawActors.size()
+                              << ", Players: " << validPlayers.size() << std::endl;
+                }
 
-        bool isPlayer = name.find("BP_Character") != std::string::npos ||
-            name.find("SolarCharacter") != std::string::npos;
-        bool isItem = false;
-
-        if (Globals.itemsEnabled && !isPlayer) {
-           
-                cache.cachedItemActors.insert(actor);
-                isItem = true;
+                {
+                    std::unique_lock lock(cache.cacheMutex);
+                    cache.Actors = std::move(validPlayers);
+                    cache.cachedItemActors = std::move(validItems);
+                    cache.lastActorList = std::move(rawActors);
+                }
+                return;
             }
-
-        if (isPlayer) cache.cachedPlayerActors.insert(actor);
-        return { isPlayer, isItem };
-        };
-
-    for (uintptr_t actor : added) processNewActor(actor);
- 
-    {
-        {
-            std::unique_lock lock(cache.cacheMutex);
-            cache.Actors.assign(cache.cachedPlayerActors.begin(), cache.cachedPlayerActors.end());
-           
-            cache.lastActorList = std::move(currentActors);
         }
     }
 
-    if (debug && (!added.empty() || !removed.empty())) {
-        std::cout << "Actor changes - Added: " << added.size() << ", Removed: " << removed.size()
-            << ", Players: " << cache.cachedPlayerActors.size() << std::endl;
-    }
+    UpdateCore(false);
 }
 
 void Game::UpdateLocal(bool debug) {
@@ -455,44 +463,69 @@ void Game::UpdateLocal(bool debug) {
 void Game::UpdateAttributes(bool debug) {
     static auto lastUpdate = std::chrono::steady_clock::now();
     auto now = std::chrono::steady_clock::now();
-    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUpdate).count() < 3000) return;
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUpdate).count() < 2000) return;
     lastUpdate = now;
 
-     
-    static uintptr_t lastValidWorld = 0;
-    uintptr_t currentWorld = cache.UWorld.load();
-    if (currentWorld != lastValidWorld) {
-        uintptr_t uWorldCheck = mem.Read<uintptr_t>(mem.baseAddress + Globals.offsets.uworld);
-        if (!util::IsValidVA(uWorldCheck) || uWorldCheck != currentWorld) {
-            UpdateCore(false);
-            return;
-        }
-        lastValidWorld = currentWorld;
-    }
-
-	 
     std::vector<uintptr_t> actorsCopy;
     {
         std::unique_lock lock(cache.cacheMutex);
         actorsCopy = cache.Actors;
     }
 
-    if (actorsCopy.size() <= 1)
-    {
-		UpdateActors(false);
-		return;
+    if (actorsCopy.size() < 2) {
+        UpdateCore(false);
+        return;
     }
 
+   
     auto scatter = mem.CreateScatterHandle();
-    std::vector<uintptr_t> meshes(actorsCopy.size()), states(actorsCopy.size());
-    std::vector<uint64_t> abilities(actorsCopy.size());
+    std::vector<uintptr_t> meshes(actorsCopy.size(), 0);
+    std::vector<uintptr_t> states(actorsCopy.size(), 0);
+    std::vector<uintptr_t> abilities(actorsCopy.size(), 0);
 
     for (size_t i = 0; i < actorsCopy.size(); ++i) {
-        if (!util::IsValidVA(actorsCopy[i])) continue;
         mem.AddScatterReadRequest(scatter, actorsCopy[i] + Globals.offsets.mesh, &meshes[i], sizeof(uintptr_t));
         mem.AddScatterReadRequest(scatter, actorsCopy[i] + Globals.offsets.Actor_State, &states[i], sizeof(uintptr_t));
-        mem.AddScatterReadRequest(scatter, actorsCopy[i] + Globals.offsets.AbilitySystemComponent, &abilities[i], sizeof(uint64_t));
-		//we can get SolarAbilitySystemComponent from ASolarCharacterBase->ACharacter->APawn->AActor
+        mem.AddScatterReadRequest(scatter, actorsCopy[i] + Globals.offsets.AbilitySystemComponent, &abilities[i], sizeof(uintptr_t));
+    }
+    mem.ExecuteReadScatter(scatter);
+
+   
+    std::vector<uintptr_t> teamInfos(actorsCopy.size(), 0);
+    std::vector<int> teamIds(actorsCopy.size(), 0);
+    std::vector<ECharacterHealthState> healthStates(actorsCopy.size());
+    std::vector<TArray<uintptr_t>> spawnedAttrs(actorsCopy.size());
+    std::vector<FString> playerNames(actorsCopy.size());
+
+    for (size_t i = 0; i < actorsCopy.size(); ++i) {
+        if (!util::IsValidVA(states[i])) continue;
+        mem.AddScatterReadRequest(scatter, states[i] + Globals.offsets.ASolarTeamInfo, &teamInfos[i], sizeof(uintptr_t));
+        mem.AddScatterReadRequest(scatter, states[i] + Globals.offsets.CharacterHealthState, &healthStates[i], sizeof(ECharacterHealthState));
+        mem.AddScatterReadRequest(scatter, states[i] + Globals.offsets.PlayerName, &playerNames[i], sizeof(FString));
+        if (util::IsValidVA(abilities[i])) {
+            mem.AddScatterReadRequest(scatter, abilities[i] + 0x150, &spawnedAttrs[i], sizeof(TArray<uintptr_t>));
+        }
+    }
+    mem.ExecuteReadScatter(scatter);
+
+   
+    std::vector<uintptr_t> firstAttrs(actorsCopy.size(), 0);
+    for (size_t i = 0; i < actorsCopy.size(); ++i) {
+        if (util::IsValidVA(teamInfos[i])) {
+            mem.AddScatterReadRequest(scatter, teamInfos[i] + Globals.offsets.teamState, &teamIds[i], sizeof(int));
+        }
+        if (spawnedAttrs[i].isValid() && spawnedAttrs[i].Num() > 0) {
+            mem.AddScatterReadRequest(scatter, spawnedAttrs[i].getAddress(), &firstAttrs[i], sizeof(uintptr_t));
+        }
+    }
+    mem.ExecuteReadScatter(scatter);
+
+   
+    std::vector<float> healths(actorsCopy.size(), 0.0f);
+    for (size_t i = 0; i < actorsCopy.size(); ++i) {
+        if (util::IsValidVA(firstAttrs[i])) {
+            mem.AddScatterReadRequest(scatter, firstAttrs[i] + 0x54, &healths[i], sizeof(float));
+        }
     }
     mem.ExecuteReadScatter(scatter);
     mem.CloseScatterHandle(scatter);
@@ -501,24 +534,19 @@ void Game::UpdateAttributes(bool debug) {
     renders.reserve(actorsCopy.size());
 
     for (size_t i = 0; i < actorsCopy.size(); ++i) {
-        if (!util::IsValidVA(states[i]) || !util::IsValidVA(abilities[i])) continue;
-		//ASolarAbilitySystemComponent -> SpawnedAttributes[TArray of UattributeSet Pointers]
-        auto SpawnedAttributes = mem.Read<TArray<uintptr_t>>(abilities[i] + 0x150);
-        if (!SpawnedAttributes.isValid() || SpawnedAttributes.Num() == 0) continue;
+        if (!util::IsValidVA(states[i])) continue;
 
         PlayerRender pr{};
         pr.Actor = actorsCopy[i];
         pr.mesh = meshes[i];
-        pr.TeamId = mem.ReadChain(states[i], { Globals.offsets.ASolarTeamInfo, Globals.offsets.teamState });
-        pr.AliveDeadorKnocked = mem.Read<ECharacterHealthState>(states[i] + Globals.offsets.CharacterHealthState);
-        pr.Health = mem.Read<float>(mem.Read<uintptr_t>(SpawnedAttributes.getAddress()) + 0x54); 
+        pr.TeamId = teamIds[i];
+        pr.AliveDeadorKnocked = healthStates[i];
+        pr.Health = healths[i];
 
-		// SpawnedAttributes[0]->FGamePlayAttributeData[CurrentHealth{0x48}]->CurrentValue{0x54}]
-		//if(debug)std::cout << "Health: " << pr.Health << std::endl;
-        FString fName = mem.Read<FString>(states[i] + Globals.offsets.PlayerName);
-        if (fName.IsValid() && fName.Count < 32) {
-            std::vector<wchar_t> buf(fName.Count + 1, 0);
-            if (mem.Read((uintptr_t)fName.Data, buf.data(), fName.Count * sizeof(wchar_t))) {
+        // Read player name
+        if (playerNames[i].IsValid() && playerNames[i].Count > 0 && playerNames[i].Count < 32) {
+            std::vector<wchar_t> buf(playerNames[i].Count + 1, 0);
+            if (mem.Read((uintptr_t)playerNames[i].Data, buf.data(), playerNames[i].Count * sizeof(wchar_t))) {
                 std::wstring ws(buf.data());
                 pr.Name = std::string(ws.begin(), ws.end());
             }
@@ -526,12 +554,16 @@ void Game::UpdateAttributes(bool debug) {
 
         renders.push_back(std::move(pr));
     }
+
     {
         std::unique_lock attrLock(AttributeMutex);
         AttributeCache.clear();
-        AttributeCache.reserve(renders.size());
         for (auto& pr : renders) {
-            if (pr.Actor) AttributeCache.emplace(pr.Actor, pr);
-        }
+            AttributeCache[pr.Actor] = pr;
         }
     }
+
+    if (debug) {
+        std::cout << "Attributes updated for " << renders.size() << " players" << std::endl;
+    }
+}

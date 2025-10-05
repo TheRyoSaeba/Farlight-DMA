@@ -22,7 +22,8 @@ public:
 	void Init();
 };
 
-   void SetOverlayMode(HWND hwnd, bool showMenu, int overlayMode, bool version);
-   void SetOverlayMode(HWND hwnd, bool isTransparent, bool menuVisible);
+void SetOverlayMode(HWND hwnd, int mode, bool menuVisible);
 
+
+   
  
