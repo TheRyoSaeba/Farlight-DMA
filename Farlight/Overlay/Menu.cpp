@@ -113,7 +113,7 @@ void DrawSidebar() {
 	}
 
 	ImGui::Spacing();
-	//REMOVED COMMENTS..
+	
 
 	float metricsHeight = 100.0f;
 	float availableHeight = ImGui::GetContentRegionAvail().y;
@@ -234,13 +234,13 @@ static void HoverTooltip(const char* txt)
 }
 static void DrawNamedColorPicker(const char* name, ImVec4& color)
 {
-    ImGui::Text("%s", name); // show the variable name
+    ImGui::Text("%s", name); 
     ImGuiColorEditFlags flags = ImGuiColorEditFlags_PickerHueWheel
         | ImGuiColorEditFlags_AlphaBar
         | ImGuiColorEditFlags_NoSidePreview
         | ImGuiColorEditFlags_NoInputs
         | ImGuiColorEditFlags_NoOptions;
-    std::string id = std::string("##picker_") + name; // hidden ID to avoid conflicts
+    std::string id = std::string("##picker_") + name; 
     ImGui::ColorEdit4(id.c_str(), (float*)&color, flags);
     ImGui::Spacing();
 }
@@ -332,43 +332,37 @@ static void DrawNamedColorPicker(const char* name, ImVec4& color)
     EWeaponType::LightMachineGun
     };
 
-    const int columns = 4;
-    ImGui::Columns(columns, nullptr, false);
-    ImGui::SetColumnOffset(0, 0);
+    std::string preview = "Select Weapons";
+    if (!Globals.enabledWeaponTypes.empty()) {
+        preview.clear();
+        for (auto w : Globals.enabledWeaponTypes) {
+            if (weaponNames.count(w)) {
+                preview += weaponNames.at(w);
+                preview += ", ";
+            }
+        }
+        if (!preview.empty()) preview.resize(preview.size() - 2);
+    }
 
-    int idx = 0;
-    for (auto w : weapons)
-    {
-        bool selected = Globals.enabledWeaponTypes.count(w) > 0;
-        const char* label = weaponNames.count(w) ? weaponNames.at(w) : "Unknown";
+    StyleColorScope comboStyle({
+        { ImGuiCol_Header, ImVec4(0.6f, 0.2f, 0.9f, 0.7f) },
+        { ImGuiCol_HeaderHovered, ImVec4(0.7f, 0.3f, 1.0f, 0.8f) },
+        { ImGuiCol_HeaderActive, ImVec4(0.8f, 0.4f, 1.0f, 1.0f) }
+        });
 
+    if (ImGui::BeginCombo("##WeaponFilter", preview.c_str(), ImGuiComboFlags_HeightLarge)) {
+        for (auto w : weapons) {
+            const char* name = weaponNames.count(w) ? weaponNames.at(w) : "Unknown";
+            bool selected = Globals.enabledWeaponTypes.count(w) > 0;
 
-        ImVec4 base = selected ? ImVec4(0.6f, 0.2f, 0.9f, 1.0f) : ImVec4(0.25f, 0.25f, 0.25f, 1.0f);
-        ImVec4 hov = ImVec4(std::min(base.x + 0.08f, 1.0f), std::min(base.y + 0.08f, 1.0f), std::min(base.z + 0.08f, 1.0f), 1.0f);
-        ImVec4 act = ImVec4(std::min(base.x + 0.16f, 1.0f), std::min(base.y + 0.16f, 1.0f), std::min(base.z + 0.16f, 1.0f), 1.0f);
-
-
-        {
-            StyleColorScope btnStyle({
-                { ImGuiCol_Button, base },
-                { ImGuiCol_ButtonHovered, hov },
-                { ImGuiCol_ButtonActive, act }
-                });
-
-
-            std::string btnLabel = std::string(label) + "##weapon" + std::to_string(static_cast<int>(w));
-            if (ImGui::Button(btnLabel.c_str(), ImVec2(-FLT_MIN, 24))) {
+            if (ImGui::Selectable(name, selected, ImGuiSelectableFlags_DontClosePopups)) {
                 if (selected) Globals.enabledWeaponTypes.erase(w);
                 else Globals.enabledWeaponTypes.insert(w);
             }
+            if (selected) ImGui::SetItemDefaultFocus();
         }
-
-
-        ImGui::NextColumn();
-        ++idx;
+        ImGui::EndCombo();
     }
-
-    ImGui::Columns(1);
 }
 
 
@@ -398,7 +392,7 @@ static void DrawNamedColorPicker(const char* name, ImVec4& color)
         }
         };
 
-    // -------- Player ESP --------
+  
     SectionHeader("Player ESP", { 0.8f,0.3f,0.0f,0.7f }, [&]() {
         ImGui::Columns(2, nullptr, false); ImGui::SetColumnOffset(1, 150);
 
@@ -419,7 +413,7 @@ static void DrawNamedColorPicker(const char* name, ImVec4& color)
         ImGui::SliderFloat("##DrawDistance", &Globals.maxDistance, 10.f, 1000.f, "%.0f m");
         });
 
-    // -------- Item ESP --------
+   
     SectionHeader("Item ESP", { 0.2f,0.7f,0.2f,0.7f }, [&]() {
         ImGui::Columns(2, nullptr, false); ImGui::SetColumnOffset(1, 150);
 
@@ -435,12 +429,12 @@ static void DrawNamedColorPicker(const char* name, ImVec4& color)
         DrawItemCategoryFilter();
         });
 
-    // -------- Weapon ESP --------
+   
     SectionHeader("Weapon ESP", { 0.5f,0.1f,0.8f,0.8f }, [&]() {
         DrawWeaponItemFilter();
         });
 
-    // -------- ESP Colors --------
+  
     SectionHeader("ESP Colors", { 0.1f, 0.6f, 0.9f, 0.7f }, [&]() {
 
         ImGui::Columns(2, nullptr, false);
@@ -508,7 +502,7 @@ static void DrawNamedColorPicker(const char* name, ImVec4& color)
     ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.8f, 0.2f, 0.6f, 0.7f));
     ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.9f, 0.3f, 0.7f, 0.8f));
     ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(1.0f, 0.4f, 0.8f, 1.0f));
-    // ---------------------- CONFIGS ----------------------
+  
     if (ImGui::CollapsingHeader("Configs", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Columns(3, nullptr, false);
         ImGui::SetColumnOffset(1, 150);
@@ -536,7 +530,7 @@ static void DrawNamedColorPicker(const char* name, ImVec4& color)
     ImGui::Separator();
     ImGui::Spacing();
 
-    // ---------------------- MENU ----------------------
+  
     ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.5f, 0.2f, 0.8f, 0.7f));
     ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.6f, 0.3f, 0.9f, 0.8f));
     ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.7f, 0.4f, 1.0f, 1.0f));
@@ -570,7 +564,7 @@ static void DrawNamedColorPicker(const char* name, ImVec4& color)
         ImGui::Spacing();
     }
 
-    // ---------------------- OPTIONS ----------------------
+   
     ImGui::PopStyleColor(3);
     ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.8f, 0.3f, 0.0f, 0.7f));
     ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(1.0f, 0.4f, 0.0f, 0.8f));
@@ -620,7 +614,7 @@ static void DrawNamedColorPicker(const char* name, ImVec4& color)
         }
         ImGui::NextColumn();
 
-        // Place color picker directly below combo, full width
+      
         ImGui::Columns(1);
         ImGui::Spacing();
         ImGui::Text("Edit Color");

@@ -327,7 +327,6 @@ void Game::Loop() {
 void Game::UpdateCore(bool debug) {
     Globals.renderPlayers.clear();
     Globals.renderItems.clear();
-
     auto base = mem.GetBaseDaddy(Globals.processName);
     auto readCoreData = [&]() -> std::optional<std::tuple<uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t>> {
         uintptr_t newUWorld = mem.Read<uintptr_t>(base + Globals.offsets.uworld);
@@ -385,7 +384,6 @@ void Game::UpdateActorsLoop() {
     }
 }
 
- 
 
 
 void Game::UpdateActors(bool debug) {
@@ -543,7 +541,7 @@ void Game::UpdateAttributes(bool debug) {
         pr.AliveDeadorKnocked = healthStates[i];
         pr.Health = healths[i];
 
-        // Read player name
+
         if (playerNames[i].IsValid() && playerNames[i].Count > 0 && playerNames[i].Count < 32) {
             std::vector<wchar_t> buf(playerNames[i].Count + 1, 0);
             if (mem.Read((uintptr_t)playerNames[i].Data, buf.data(), playerNames[i].Count * sizeof(wchar_t))) {

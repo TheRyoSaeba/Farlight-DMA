@@ -33,6 +33,8 @@ void ItemESP::RefreshLoop() {
 	}
 }
 
+/* Tried to follow this but had issues :https://www.unknowncheats.me/forum/valorant/585072-actors-looping.html */
+
 void ItemESP::RefreshList() {
 	extern struct _GameCache cache;
 
@@ -42,7 +44,7 @@ void ItemESP::RefreshList() {
 		return;
 	}
 
-	// Get ALL current item actors from game cache
+	
 	std::unordered_set<uintptr_t> currentActors;
 	{
 		std::unique_lock lk(cache.cacheMutex);
@@ -57,7 +59,7 @@ void ItemESP::RefreshList() {
 
 	std::vector<uintptr_t> actorList(currentActors.begin(), currentActors.end());
 
-	// Separate new actors from existing cached actors
+	
 	std::vector<uintptr_t> newActors;
 	std::vector<uintptr_t> existingActors;
 	{
@@ -73,7 +75,7 @@ void ItemESP::RefreshList() {
 
 	std::unordered_map<uintptr_t, ItemRenderer> newCache;
 
-	// For existing items: only update transforms (fast path)
+	
 	if (!existingActors.empty()) {
 		auto scatter = mem.CreateScatterHandle();
 		std::vector<uintptr_t> rootComps(existingActors.size());
@@ -93,7 +95,7 @@ void ItemESP::RefreshList() {
 		mem.ExecuteReadScatter(scatter);
 		mem.CloseScatterHandle(scatter);
 
-		// Update cached items with new positions
+		
 		std::unique_lock lk(Globals.itemMutex);
 		for (size_t i = 0; i < existingActors.size(); ++i) {
 			auto it = cachedItems.find(existingActors[i]);
@@ -104,7 +106,7 @@ void ItemESP::RefreshList() {
 		}
 	}
 
-	// For new items: do full read (slow path, but only for new items)
+	
 	if (newActors.empty()) {
 		std::unique_lock lk(Globals.itemMutex);
 		cachedItems = newCache;
@@ -135,14 +137,14 @@ void ItemESP::RefreshList() {
 	mem.ExecuteReadScatter(scatter);
 	mem.CloseScatterHandle(scatter);
 
-	// Collect valid NEW items to cache
+
 	std::vector<size_t> validIndices;
 	for (size_t i = 0; i < newActors.size(); ++i) {
 		if (itemData[i].ItemType == EItemType::NONE) continue;
 		validIndices.push_back(i);
 	}
 
-	// Batch read names for valid items
+	
 	if (!validIndices.empty()) {
 		auto nameScatter = mem.CreateScatterHandle();
 		std::vector<std::vector<wchar_t>> stringBuffers(validIndices.size());
@@ -161,7 +163,7 @@ void ItemESP::RefreshList() {
 		mem.ExecuteReadScatter(nameScatter);
 		mem.CloseScatterHandle(nameScatter);
 
-		// Add new items to cache
+		
 		for (size_t j = 0; j < validIndices.size(); ++j) {
 			size_t i = validIndices[j];
 
@@ -180,7 +182,7 @@ void ItemESP::RefreshList() {
 		}
 	}
 
-	// Replace cache atomically
+	
 	{
 		std::unique_lock lk(Globals.itemMutex);
 		cachedItems = std::move(newCache);
@@ -209,11 +211,11 @@ void ItemESP::Render(const Camera& cam, int screenW, int screenH) {
 		dummy.scale = { 1, 1, 1 };
 
 		for (const auto& [actor, cached] : cachedItems) {
-			// Filter by category
+			
 			EItemCategory cat = GetItemCategory(cached.Item);
 			if (Globals.enabledItemCategories.find(cat) == Globals.enabledItemCategories.end()) continue;
 
-			// Filter weapons by type
+			
 			if (cat == EItemCategory::WEAPONS) {
 				if (Globals.enabledWeaponTypes.find(cached.Weapon) == Globals.enabledWeaponTypes.end()) continue;
 			}

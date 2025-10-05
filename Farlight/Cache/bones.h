@@ -47,7 +47,7 @@ enum class BoneID : int {
     FootR = 69
 };
 
-// Bones needed for skeleton ESP rendering
+
 static constexpr std::array<BoneID, 18> SKELETON_BONES = {
     BoneID::Pelvis,
     BoneID::Spine01,
@@ -91,7 +91,6 @@ static const std::unordered_map<std::string, BoneID> BONE_NAME_MAP = {
     {"foot_r", BoneID::FootR}
 };
 
-// Populate skeleton struct from bone transforms
 template<typename TransformFunc>
 inline void PopulateSkeletonBones(SkeletonBones& skeleton, const std::unordered_map<int, FTransform>& boneTransforms, TransformFunc doMatrix) {
     skeleton.pelvis = doMatrix(boneTransforms.at(static_cast<int>(BoneID::Pelvis)));
@@ -114,17 +113,16 @@ inline void PopulateSkeletonBones(SkeletonBones& skeleton, const std::unordered_
     skeleton.footR = doMatrix(boneTransforms.at(static_cast<int>(BoneID::FootR)));
 }
 
-// Draw skeleton using ImGui (must be included in rendering context)
+
 template<typename DrawLineFunc>
 inline void DrawSkeletonLines(const SkeletonBones& s, DrawLineFunc drawLine) {
-    // Head to neck to spine chain (spine03 is upper, spine01 is lower)
-    drawLine(s.head, s.neck01);
+   
     drawLine(s.neck01, s.spine03);
     drawLine(s.spine03, s.spine02);
     drawLine(s.spine02, s.spine01);
     drawLine(s.spine01, s.pelvis);
 
-    // Arms from spine03 (upper spine/shoulders)
+   
     drawLine(s.spine03, s.upperArmL);
     drawLine(s.spine03, s.upperArmR);
 

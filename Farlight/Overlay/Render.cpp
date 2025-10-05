@@ -63,7 +63,7 @@ void DrawBox(Vector2 position, float width, float height, ImColor color, float t
 }
 void DrawHeadCircle(Vector2 position, float radius, ImColor color, float thickness = 3.0f) {
 	ImVec2 center(position.x, position.y - radius / 2);
-	//make the head circle much smaller
+	
 	ImGui::GetForegroundDrawList()->AddCircle(center, radius / 2, color, 20, thickness);
 
 }
@@ -72,7 +72,7 @@ void DrawTraceline(Vector2 start, Vector2 end, ImColor color, float thickness = 
 }
 void DrawDistanceText(Vector2 position, float distance, ImColor color)
 {
-	// Subtract 4 meters from the reported distance, clamp to zero
+
 	float adjustedDistance = distance - 4.0f;
 	if (adjustedDistance < 0.0f) adjustedDistance = 0.0f;
 
@@ -113,10 +113,10 @@ void DrawHealthBar(Vector2 center, float health, float width = 6.0f, float heigh
 }
 void DrawNames(Vector2 position, const std::string& name, ImColor color)
 {
-	// Calculate text size using the explicit font and size
+	
 	ImVec2 ts = Globals.headerFont->CalcTextSizeA(15.0f, FLT_MAX, 0.0f, name.c_str());
 	ImVec2 tp(position.x + 4, position.y - ts.y / 2 - 20);
-	// Use the explicit font and size for drawing
+
 	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, ImVec2(tp.x + 1, tp.y + 1), ImColor(0, 0, 0, 150), name.c_str());
 	ImGui::GetForegroundDrawList()->AddText(Globals.logoFont, 18.0f, tp, color, name.c_str());
 }
